@@ -1,0 +1,769 @@
+{
+ "palette": {
+  "0": "#181425",
+  "1": "#262b44",
+  "2": "#3a4466",
+  "3": "#5a6988",
+  "4": "#8b9bb4",
+  "5": "#c0cbdc",
+  "6": "#ffffff",
+  "r": "#e43b44",
+  "R": "#a22633",
+  "M": "#ff0044",
+  "F": "#f6757a",
+  "o": "#f77622",
+  "O": "#be4a2f",
+  "d": "#d77643",
+  "y": "#feae34",
+  "Y": "#fee761",
+  "g": "#63c74d",
+  "G": "#3e8948",
+  "H": "#265c42",
+  "D": "#193c3e",
+  "c": "#2ce8f5",
+  "b": "#0099db",
+  "B": "#124e89",
+  "p": "#b55088",
+  "P": "#68386c",
+  "n": "#e8b796",
+  "a": "#e4a672",
+  "N": "#c28569",
+  "t": "#b86f50",
+  "T": "#733e39",
+  "e": "#3e2731",
+  "E": "#ead4aa"
+ },
+ "sheets": {
+  "player": {
+   "file": "player.png",
+   "cellW": 16,
+   "cellH": 16
+  },
+  "npcs": {
+   "file": "npcs.png",
+   "cellW": 16,
+   "cellH": 16
+  },
+  "slime": {
+   "file": "slime.png",
+   "cellW": 16,
+   "cellH": 16
+  },
+  "skeleton": {
+   "file": "skeleton.png",
+   "cellW": 16,
+   "cellH": 16
+  },
+  "bat": {
+   "file": "bat.png",
+   "cellW": 16,
+   "cellH": 16
+  },
+  "archer": {
+   "file": "archer.png",
+   "cellW": 16,
+   "cellH": 16
+  },
+  "brute": {
+   "file": "brute.png",
+   "cellW": 16,
+   "cellH": 16
+  },
+  "boss": {
+   "file": "boss.png",
+   "cellW": 32,
+   "cellH": 32
+  },
+  "terrain": {
+   "file": "terrain.png",
+   "cellW": 16,
+   "cellH": 16
+  },
+  "props": {
+   "file": "props.png",
+   "cellW": 16,
+   "cellH": 16
+  },
+  "items": {
+   "file": "items.png",
+   "cellW": 16,
+   "cellH": 16
+  },
+  "ui": {
+   "file": "ui.png",
+   "cellW": 16,
+   "cellH": 16
+  },
+  "panel": {
+   "file": "panel.png",
+   "cellW": 48,
+   "cellH": 48
+  }
+ },
+ "anims": {
+  "player_walk_down": {
+   "sheet": "player",
+   "row": 0,
+   "frames": 3,
+   "w": 16,
+   "h": 16,
+   "fps": 8
+  },
+  "player_walk_up": {
+   "sheet": "player",
+   "row": 1,
+   "frames": 3,
+   "w": 16,
+   "h": 16,
+   "fps": 8
+  },
+  "player_walk_right": {
+   "sheet": "player",
+   "row": 2,
+   "frames": 3,
+   "w": 16,
+   "h": 16,
+   "fps": 8
+  },
+  "player_walk_left": {
+   "sheet": "player",
+   "row": 3,
+   "frames": 3,
+   "w": 16,
+   "h": 16,
+   "fps": 8
+  },
+  "player_attack_down": {
+   "sheet": "player",
+   "row": 4,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "player_attack_up": {
+   "sheet": "player",
+   "row": 5,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "player_attack_right": {
+   "sheet": "player",
+   "row": 6,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "player_attack_left": {
+   "sheet": "player",
+   "row": 7,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "player_hurt": {
+   "sheet": "player",
+   "row": 8,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "npc_elder": {
+   "sheet": "npcs",
+   "row": 0,
+   "frames": 2,
+   "w": 16,
+   "h": 16,
+   "fps": 2
+  },
+  "npc_woman": {
+   "sheet": "npcs",
+   "row": 1,
+   "frames": 2,
+   "w": 16,
+   "h": 16,
+   "fps": 2
+  },
+  "npc_smith": {
+   "sheet": "npcs",
+   "row": 2,
+   "frames": 2,
+   "w": 16,
+   "h": 16,
+   "fps": 2
+  },
+  "npc_kid": {
+   "sheet": "npcs",
+   "row": 3,
+   "frames": 2,
+   "w": 16,
+   "h": 16,
+   "fps": 2
+  },
+  "slime_idle": {
+   "sheet": "slime",
+   "row": 0,
+   "frames": 2,
+   "w": 16,
+   "h": 16,
+   "fps": 4
+  },
+  "slime_die": {
+   "sheet": "slime",
+   "row": 1,
+   "frames": 3,
+   "w": 16,
+   "h": 16,
+   "fps": 12
+  },
+  "skeleton_walk": {
+   "sheet": "skeleton",
+   "row": 0,
+   "frames": 2,
+   "w": 16,
+   "h": 16,
+   "fps": 5
+  },
+  "skeleton_die": {
+   "sheet": "skeleton",
+   "row": 1,
+   "frames": 3,
+   "w": 16,
+   "h": 16,
+   "fps": 12
+  },
+  "bat_fly": {
+   "sheet": "bat",
+   "row": 0,
+   "frames": 2,
+   "w": 16,
+   "h": 16,
+   "fps": 6
+  },
+  "bat_die": {
+   "sheet": "bat",
+   "row": 1,
+   "frames": 3,
+   "w": 16,
+   "h": 16,
+   "fps": 12
+  },
+  "archer_idle": {
+   "sheet": "archer",
+   "row": 0,
+   "frames": 2,
+   "w": 16,
+   "h": 16,
+   "fps": 3
+  },
+  "archer_die": {
+   "sheet": "archer",
+   "row": 1,
+   "frames": 3,
+   "w": 16,
+   "h": 16,
+   "fps": 12
+  },
+  "brute_walk": {
+   "sheet": "brute",
+   "row": 0,
+   "frames": 2,
+   "w": 16,
+   "h": 16,
+   "fps": 3
+  },
+  "brute_die": {
+   "sheet": "brute",
+   "row": 1,
+   "frames": 3,
+   "w": 16,
+   "h": 16,
+   "fps": 12
+  },
+  "boss_idle": {
+   "sheet": "boss",
+   "row": 0,
+   "frames": 2,
+   "w": 32,
+   "h": 32,
+   "fps": 3
+  },
+  "boss_attack": {
+   "sheet": "boss",
+   "row": 1,
+   "frames": 1,
+   "w": 32,
+   "h": 32,
+   "fps": 0
+  },
+  "boss_die": {
+   "sheet": "boss",
+   "row": 2,
+   "frames": 3,
+   "w": 32,
+   "h": 32,
+   "fps": 12
+  },
+  "grass_1": {
+   "sheet": "terrain",
+   "row": 0,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "grass_2": {
+   "sheet": "terrain",
+   "row": 1,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "grass_3": {
+   "sheet": "terrain",
+   "row": 2,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "grass_flowers": {
+   "sheet": "terrain",
+   "row": 3,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "path": {
+   "sheet": "terrain",
+   "row": 4,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "path_edge_n": {
+   "sheet": "terrain",
+   "row": 5,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "path_edge_s": {
+   "sheet": "terrain",
+   "row": 6,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "path_edge_e": {
+   "sheet": "terrain",
+   "row": 7,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "path_edge_w": {
+   "sheet": "terrain",
+   "row": 8,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "path_edge_nw": {
+   "sheet": "terrain",
+   "row": 9,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "path_edge_ne": {
+   "sheet": "terrain",
+   "row": 10,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "path_edge_sw": {
+   "sheet": "terrain",
+   "row": 11,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "path_edge_se": {
+   "sheet": "terrain",
+   "row": 12,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "water": {
+   "sheet": "terrain",
+   "row": 13,
+   "frames": 4,
+   "w": 16,
+   "h": 16,
+   "fps": 5
+  },
+  "shore_n": {
+   "sheet": "terrain",
+   "row": 14,
+   "frames": 4,
+   "w": 16,
+   "h": 16,
+   "fps": 5
+  },
+  "shore_s": {
+   "sheet": "terrain",
+   "row": 15,
+   "frames": 4,
+   "w": 16,
+   "h": 16,
+   "fps": 5
+  },
+  "shore_e": {
+   "sheet": "terrain",
+   "row": 16,
+   "frames": 4,
+   "w": 16,
+   "h": 16,
+   "fps": 5
+  },
+  "shore_w": {
+   "sheet": "terrain",
+   "row": 17,
+   "frames": 4,
+   "w": 16,
+   "h": 16,
+   "fps": 5
+  },
+  "shore_nw": {
+   "sheet": "terrain",
+   "row": 18,
+   "frames": 4,
+   "w": 16,
+   "h": 16,
+   "fps": 5
+  },
+  "shore_ne": {
+   "sheet": "terrain",
+   "row": 19,
+   "frames": 4,
+   "w": 16,
+   "h": 16,
+   "fps": 5
+  },
+  "shore_sw": {
+   "sheet": "terrain",
+   "row": 20,
+   "frames": 4,
+   "w": 16,
+   "h": 16,
+   "fps": 5
+  },
+  "shore_se": {
+   "sheet": "terrain",
+   "row": 21,
+   "frames": 4,
+   "w": 16,
+   "h": 16,
+   "fps": 5
+  },
+  "tree": {
+   "sheet": "terrain",
+   "row": 22,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "stone": {
+   "sheet": "terrain",
+   "row": 23,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "wall_stone": {
+   "sheet": "terrain",
+   "row": 24,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "wall_dungeon": {
+   "sheet": "terrain",
+   "row": 25,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "wall_wood": {
+   "sheet": "terrain",
+   "row": 26,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "floor_wood": {
+   "sheet": "terrain",
+   "row": 27,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "floor_stone": {
+   "sheet": "terrain",
+   "row": 28,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "roof_red": {
+   "sheet": "terrain",
+   "row": 29,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "roof_blue": {
+   "sheet": "terrain",
+   "row": 30,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "door": {
+   "sheet": "terrain",
+   "row": 31,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "chest_closed": {
+   "sheet": "props",
+   "row": 0,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "chest_open": {
+   "sheet": "props",
+   "row": 1,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "sign": {
+   "sheet": "props",
+   "row": 2,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "torch": {
+   "sheet": "props",
+   "row": 3,
+   "frames": 3,
+   "w": 16,
+   "h": 16,
+   "fps": 8
+  },
+  "fence": {
+   "sheet": "props",
+   "row": 4,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "barrel": {
+   "sheet": "props",
+   "row": 5,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_dagger": {
+   "sheet": "items",
+   "row": 0,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_sword": {
+   "sheet": "items",
+   "row": 1,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_greatsword": {
+   "sheet": "items",
+   "row": 2,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_armor_leather": {
+   "sheet": "items",
+   "row": 3,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_armor_chain": {
+   "sheet": "items",
+   "row": 4,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_armor_plate": {
+   "sheet": "items",
+   "row": 5,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_potion": {
+   "sheet": "items",
+   "row": 6,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_potion_big": {
+   "sheet": "items",
+   "row": 7,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_gel": {
+   "sheet": "items",
+   "row": 8,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_bone": {
+   "sheet": "items",
+   "row": 9,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_letter": {
+   "sheet": "items",
+   "row": 10,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_herb": {
+   "sheet": "items",
+   "row": 11,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_key": {
+   "sheet": "items",
+   "row": 12,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_amulet": {
+   "sheet": "items",
+   "row": 13,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "heart_full": {
+   "sheet": "ui",
+   "row": 0,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "heart_half": {
+   "sheet": "ui",
+   "row": 1,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "heart_empty": {
+   "sheet": "ui",
+   "row": 2,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "coin": {
+   "sheet": "ui",
+   "row": 3,
+   "frames": 4,
+   "w": 16,
+   "h": 16,
+   "fps": 8
+  },
+  "panel": {
+   "sheet": "panel",
+   "row": 0,
+   "frames": 1,
+   "w": 48,
+   "h": 48,
+   "fps": 0
+  }
+ }
+}

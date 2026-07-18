@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sprite Review</title>
+<style>
+  body { background:#2b2b33; color:#ddd; font-family:system-ui,sans-serif; margin:0; padding:24px; }
+  h1 { font-size:20px; }
+  h2 { font-size:16px; border-bottom:1px solid #555; padding-bottom:4px; margin-top:32px; }
+  .cards { display:flex; flex-wrap:wrap; gap:14px; }
+  .card { background:#3a3a44; border:1px solid #555; border-radius:6px; padding:8px; text-align:center; }
+  .card .name { font-size:11px; color:#bbb; margin-top:6px; max-width:140px; word-break:break-all; }
+  .card canvas { image-rendering:pixelated; display:block; margin:0 auto; }
+  .zoom { background:#808080; }
+  .one { background:#808080; margin-top:4px !important; }
+  .meta { font-size:10px; color:#888; }
+  .swatches { display:flex; flex-wrap:wrap; gap:6px; }
+  .sw { width:56px; height:56px; border-radius:4px; display:flex; align-items:flex-end;
+        justify-content:center; font-size:10px; color:#fff; text-shadow:0 1px 2px #000; border:1px solid #000; }
+  .demo canvas { image-rendering:pixelated; background:#808080; }
+</style>
+</head>
+<body>
+<h1>Sprite Review — every sprite at 8× and 1×, animations live</h1>
+<p class="meta">Gray background is mid-gray (#808080) for the 1× readability test. Animations loop at their game fps.</p>
+<div id="root"></div>
+<script>
+const SCALE = 8;
+const root = document.getElementById('root');
+const sheetImgs = {};
+
+function el(tag, cls, parent) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+async function loadImage(src) {
+  return new Promise((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = rej;
+    i.src = src;
+  });
+}
+
+const animCards = [];  // {ctx8, ctx1, img, def, frame}
+
+function makeCard(name, def, parent) {
+  const card = el('div', 'card', parent);
+  const c8 = el('canvas', 'zoom', card);
+  c8.width = def.w * SCALE; c8.height = def.h * SCALE;
+  const c1 = el('canvas', 'one', card);
+  c1.width = def.w; c1.height = def.h;
+  const label = el('div', 'name', card);
+  label.textContent = name;
+  const meta = el('div', 'meta', card);
+  meta.textContent = def.frames > 1 ? `${def.frames} frames @ ${def.fps}fps` : 'static';
+  const img = sheetImgs[def.sheet];
+  const ctx8 = c8.getContext('2d'); ctx8.imageSmoothingEnabled = false;
+  const ctx1 = c1.getContext('2d'); ctx1.imageSmoothingEnabled = false;
+  animCards.push({ctx8, ctx1, img, def, t:0});
+}
+
+function drawFrame(entry, fi) {
+  const {ctx8, ctx1, img, def} = entry;
+  const sx = fi * def.w, sy = def.row * def.h;
+  ctx8.clearRect(0, 0, def.w * SCALE, def.h * SCALE);
+  ctx8.drawImage(img, sx, sy, def.w, def.h, 0, 0, def.w * SCALE, def.h * SCALE);
+  ctx1.clearRect(0, 0, def.w, def.h);
+  ctx1.drawImage(img, sx, sy, def.w, def.h, 0, 0, def.w, def.h);
+}
+
+// tiling demos: little maps using terrain anims, drawn at 4x
+const DEMOS = [
+  {name: 'grass field (variants mixed)', w: 6, h: 4, map: (x, y) =>
+    ['grass_1','grass_2','grass_3','grass_1','grass_flowers','grass_2'][(x*3+y*5)%6]},
+  {name: 'path through grass', w: 7, h: 5, map: (x, y) => {
+    // horizontal path band across rows 1-3
+    if (y === 0) return ['grass_1','grass_2','grass_3'][(x + y) % 3];
+    if (y === 1) return 'path_edge_n';
+    if (y === 2) return 'path';
+    if (y === 3) return 'path_edge_s';
+    return ['grass_3','grass_1','grass_2'][(x * 2 + y) % 3];
+  }},
+  {name: 'pond with shores', w: 6, h: 5, map: (x, y) => {
+    if (y===0) return x===0?'shore_nw':x===5?'shore_ne':'shore_n';
+    if (y===4) return x===0?'shore_sw':x===5?'shore_se':'shore_s';
+    return x===0?'shore_w':x===5?'shore_e':'water';
+  }},
+  {name: 'building (walls, roof, door)', w: 5, h: 5, map: (x, y) => {
+    if (y < 2) return 'roof_red';
+    if (y < 4) return 'wall_stone';
+    return x === 2 ? 'door' : 'wall_stone';
+  }},
+  {name: 'dungeon (walls + floor)', w: 6, h: 4, map: (x, y) =>
+    (y===0||x===0||x===5) ? 'wall_dungeon' : 'floor_stone'},
+  {name: 'interior (wood)', w: 6, h: 4, map: (x, y) =>
+    (y===0) ? 'wall_wood' : 'floor_wood'},
+];
+const demoCards = [];
+
+async function init() {
+  const manifest = await (await fetch('../assets/sprites/manifest.json')).json();
+  for (const [name, s] of Object.entries(manifest.sheets)) {
+    sheetImgs[name] = await loadImage('../assets/sprites/' + s.file);
+  }
+
+  // palette
+  const h = el('h2', null, root); h.textContent =
+    'Master palette (' + Object.keys(manifest.palette).length + ' colours)';
+  const sws = el('div', 'swatches', root);
+  for (const [ch, hex] of Object.entries(manifest.palette)) {
+    const sw = el('div', 'sw', sws);
+    sw.style.background = hex;
+    sw.textContent = ch + ' ' + hex;
+  }
+
+  // group anims by sheet
+  const bySheet = {};
+  for (const [name, def] of Object.entries(manifest.anims)) {
+    (bySheet[def.sheet] = bySheet[def.sheet] || []).push([name, def]);
+  }
+  for (const [sheet, anims] of Object.entries(bySheet)) {
+    const h2 = el('h2', null, root);
+    h2.textContent = sheet + '.png';
+    const wrap = el('div', 'cards', root);
+    for (const [name, def] of anims) makeCard(name, def, wrap);
+  }
+
+  // tiling demos
+  const h2 = el('h2', null, root);
+  h2.textContent = 'Tiling tests (seams should be invisible)';
+  const wrap = el('div', 'cards demo', root);
+  for (const demo of DEMOS) {
+    const card = el('div', 'card', wrap);
+    const c = el('canvas', null, card);
+    c.width = demo.w * 16 * 4; c.height = demo.h * 16 * 4;
+    const label = el('div', 'name', card);
+    label.textContent = demo.name;
+    demoCards.push({ctx: c.getContext('2d'), demo, manifest});
+    demoCards[demoCards.length - 1].ctx.imageSmoothingEnabled = false;
+  }
+
+  requestAnimationFrame(tick);
+  function tick(now) {
+    for (const entry of animCards) {
+      const {def} = entry;
+      const fi = def.frames > 1 ? Math.floor(now / 1000 * def.fps) % def.frames : 0;
+      drawFrame(entry, fi);
+    }
+    for (const {ctx, demo, manifest} of demoCards) {
+      for (let y = 0; y < demo.h; y++) for (let x = 0; x < demo.w; x++) {
+        const name = demo.map(x, y);
+        const def = manifest.anims[name];
+        if (!def) continue;
+        const fi = def.frames > 1 ? Math.floor(now / 1000 * def.fps) % def.frames : 0;
+        ctx.drawImage(sheetImgs[def.sheet], fi * def.w, def.row * def.h, def.w, def.h,
+                      x * 16 * 4, y * 16 * 4, 16 * 4, 16 * 4);
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+}
+init();
+</script>
+</body>
+</html>
