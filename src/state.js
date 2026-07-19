@@ -7,8 +7,8 @@ export const VH = 180;
 export const G = {
   mode: 'title',        // title | play | dialogue | inventory | quests | shop | pause | gameover
   time: 0,
-  canvas: null, ctx: null,      // scaled display canvas
-  screen: null, sctx: null,     // internal 320x180 canvas
+  canvas: null, ctx: null,      // display canvas, drawn at integer zoom
+  zoom: 1,                      // device pixels per game pixel
   cam: { x: 0, y: 0 },
   shake: 0,
   hitstop: 0,

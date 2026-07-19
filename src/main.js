@@ -29,13 +29,20 @@ G.canvas = canvas;
 G.ctx = canvas.getContext('2d');
 G.ctx.imageSmoothingEnabled = false;
 
+// Render at an integer number of device pixels per game pixel, so the
+// browser never resamples: the canvas backing store is the final image.
 function resize() {
-  const scale = Math.min(innerWidth / VW, innerHeight / VH);
-  const s = scale >= 1 ? Math.max(1, Math.floor(scale * 2) / 2) : scale;
-  canvas.style.width = VW * s + 'px';
-  canvas.style.height = VH * s + 'px';
-  canvas.style.left = (innerWidth - VW * s) / 2 + 'px';
-  canvas.style.top = (innerHeight - VH * s) / 2 + 'px';
+  const dpr = window.devicePixelRatio || 1;
+  const fit = Math.min(innerWidth / VW, innerHeight / VH);
+  const z = Math.max(1, Math.floor(fit * dpr));
+  G.zoom = z;
+  canvas.width = VW * z;
+  canvas.height = VH * z;
+  const cssW = VW * z / dpr, cssH = VH * z / dpr;
+  canvas.style.width = cssW + 'px';
+  canvas.style.height = cssH + 'px';
+  canvas.style.left = (innerWidth - cssW) / 2 + 'px';
+  canvas.style.top = (innerHeight - cssH) / 2 + 'px';
 }
 addEventListener('resize', resize);
 resize();
@@ -329,6 +336,7 @@ function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
 function draw() {
   const ctx = G.ctx;
+  ctx.setTransform(G.zoom, 0, 0, G.zoom, 0, 0);
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = '#181425';
   ctx.fillRect(0, 0, VW, VH);
