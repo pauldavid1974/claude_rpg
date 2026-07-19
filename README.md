@@ -13,14 +13,40 @@ python3 -m http.server 8000
 
 Then open:
 
-- **Game**: http://localhost:8000/ *(Phase 1 — built after art approval)*
+- **Game**: http://localhost:8000/
 - **Sprite review page**: http://localhost:8000/tools/review.html
+
+## Controls
+
+| Action    | Keys              |
+| --------- | ----------------- |
+| Move      | WASD / arrow keys |
+| Attack    | Space / J         |
+| Interact  | E / Enter         |
+| Inventory | I / Tab           |
+| Quest log | Q                 |
+| Pause     | Esc               |
+| Mute      | M                 |
+
+Touch devices get an on-screen d-pad and buttons automatically.
+
+## The game
+
+Emberdale is a 20–30 minute action RPG: an overworld with fields, forest,
+pond and roads; two towns (Emberdale and Ashvale) with enterable shops and
+houses; and the Old Crypt dungeon. Seven quests — a five-step main
+questline ending at the Bone King, plus two side quests — with real-time
+melee combat against six monster types, a grid inventory with three tiers
+of weapons and armor, two shops with buy/sell, synthesized music and sound
+(WebAudio, no audio files), and autosave to localStorage.
 
 ## Project layout
 
 ```
-index.html          entry point (Phase 1)
-src/                game modules (Phase 1)
+index.html          entry point
+src/                ES modules: main loop, state, assets, input, audio,
+                    maps, entities, combat, particles, items, inventory,
+                    quests, dialogue, shops, ui, save
 assets/sprites/     generated PNG spritesheets + manifest.json
 tools/gen_sprites.py   sprite generator — draws every sprite in code
 tools/review.html      sprite gallery: 8× + 1× views, live animations, palette
