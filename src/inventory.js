@@ -101,15 +101,22 @@ export function updateInventory(dt) {
   if (input.pressed.down) { st.sel = (st.sel + COLS) % (COLS * ROWS); sfx('menu'); }
   if (input.pressed.interact) useSelected();
   if (input.pressed.attack) dropSelected();
-  // mouse
-  const { mx, my, cells } = layout();
+  // mouse: hover/click cells; click outside the panels closes
+  const { mx, my, w, h, cells } = layout();
+  let onCell = false;
   for (let i = 0; i < cells.length; i++) {
     const c = cells[i];
     if (input.mouse.x >= c.x && input.mouse.x < c.x + 20 &&
         input.mouse.y >= c.y && input.mouse.y < c.y + 20) {
       st.sel = i;
+      onCell = true;
       if (input.mouse.clicked) useSelected();
     }
+  }
+  if (input.mouse.clicked && !onCell &&
+      (input.mouse.x < mx || input.mouse.x > mx + w + 4 + 128 ||
+       input.mouse.y < my || input.mouse.y > my + h)) {
+    G.mode = 'play'; sfx('menu');
   }
 }
 

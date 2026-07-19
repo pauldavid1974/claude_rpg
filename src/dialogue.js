@@ -20,18 +20,33 @@ export function say(name, pages, extra = {}) {
   G.mode = 'dialogue';
 }
 
+function choiceRow(i) {
+  // hit zones matching where drawDialogue puts the two choice lines
+  const x = Math.round((VW - 272) / 2), y = VH - 60;
+  return input.mouse.x > x + 144 && input.mouse.x < x + 240 &&
+         input.mouse.y > y + 18 + i * 12 && input.mouse.y < y + 30 + i * 12;
+}
+
 export function updateDialogue(dt) {
+  const advance = input.pressed.interact || input.pressed.attack || input.mouse.clicked;
   const text = script.pages[page];
   if (chars < text.length) {
     chars = Math.min(text.length, chars + dt * 45);
-    if (input.pressed.interact || input.pressed.attack) chars = text.length; // skip typing
+    if (advance) chars = text.length; // skip typing
     return;
   }
   if (choosing) {
     if (input.pressed.up || input.pressed.down || input.pressed.left || input.pressed.right) {
       choiceSel = 1 - choiceSel; sfx('menu');
     }
-    if (input.pressed.interact) {
+    let confirm = input.pressed.interact;
+    for (const i of [0, 1]) {
+      if (choiceRow(i)) {
+        if (choiceSel !== i) { choiceSel = i; sfx('menu'); }
+        if (input.mouse.clicked) confirm = true;
+      }
+    }
+    if (confirm) {
       const c = script.choice;
       const cb = choiceSel === 0 ? c.onYes : c.onNo;
       script = null;
@@ -41,7 +56,7 @@ export function updateDialogue(dt) {
     }
     return;
   }
-  if (input.pressed.interact || input.pressed.attack) {
+  if (advance) {
     if (page < script.pages.length - 1) {
       page++; chars = 0; sfx('menu');
     } else if (script.choice) {

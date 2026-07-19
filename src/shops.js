@@ -49,20 +49,27 @@ export function updateShop(dt) {
     if (st.tab === 'buy') buy(list[st.sel]);
     else sell(list[st.sel]);
   }
-  // mouse: rows + tab headers
-  const { rows, tabs } = layout(list);
+  // mouse: rows + tab headers; click outside the panel leaves the shop
+  const { x, y, w, rows, tabs } = layout(list);
+  let onUi = false;
   for (const [i, r] of rows.entries()) {
     if (input.mouse.x >= r.x && input.mouse.x < r.x + r.w &&
         input.mouse.y >= r.y - 8 && input.mouse.y < r.y + 6) {
       st.sel = i;
+      onUi = true;
       if (input.mouse.clicked) (st.tab === 'buy' ? buy(list[i]) : sell(list[i]));
     }
   }
   for (const t of tabs) {
     if (input.mouse.clicked && input.mouse.x >= t.x && input.mouse.x < t.x + 40 &&
         input.mouse.y >= t.y - 8 && input.mouse.y < t.y + 4) {
-      st.tab = t.id; st.sel = 0; sfx('menu');
+      st.tab = t.id; st.sel = 0; onUi = true; sfx('menu');
     }
+  }
+  if (input.mouse.clicked && !onUi &&
+      (input.mouse.x < x || input.mouse.x > x + w ||
+       input.mouse.y < y || input.mouse.y > y + 152)) {
+    G.mode = 'play'; sfx('menu');
   }
 }
 

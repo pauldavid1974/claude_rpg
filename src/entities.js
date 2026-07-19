@@ -69,19 +69,13 @@ export function playerStats() {
   };
 }
 
-export function updatePlayerMovement(dt, held) {
+// dx/dy: desired movement vector (any magnitude; normalized here).
+export function updatePlayerMovement(dt, dx, dy) {
   const p = G.player;
-  let dx = 0, dy = 0;
-  if (held.left) dx -= 1;
-  if (held.right) dx += 1;
-  if (held.up) dy -= 1;
-  if (held.down) dy += 1;
   p.moving = (dx || dy) && p.attackT <= 0;
   if (p.moving) {
-    if (dy < 0) p.dir = 'up';
-    if (dy > 0) p.dir = 'down';
-    if (dx < 0) p.dir = 'left';
-    if (dx > 0) p.dir = 'right';
+    if (Math.abs(dx) > Math.abs(dy)) p.dir = dx < 0 ? 'left' : 'right';
+    else p.dir = dy < 0 ? 'up' : 'down';
     const len = Math.hypot(dx, dy);
     const step = p.speed * dt;
     moveEntity(p, dx / len * step, 0);
@@ -93,6 +87,13 @@ export function updatePlayerMovement(dt, held) {
   }
   if (p.attackT > 0) p.attackT -= dt;
   if (p.iframes > 0) p.iframes -= dt;
+}
+
+export function facePoint(wx, wy) {
+  const p = G.player;
+  const dx = wx - (p.x + 8), dy = wy - (p.y + 11);
+  if (Math.abs(dx) > Math.abs(dy)) p.dir = dx < 0 ? 'left' : 'right';
+  else p.dir = dy < 0 ? 'up' : 'down';
 }
 
 // --- monsters ----------------------------------------------------------

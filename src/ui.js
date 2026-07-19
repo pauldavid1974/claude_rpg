@@ -86,7 +86,26 @@ export function drawHud(ctx) {
       ctx.globalAlpha = 1;
     }
   }
-  if (G.muted) drawText(ctx, 'MUTED (M)', VW - 54, 10, '#5a6988');
+  // clickable HUD buttons (touch devices have their own DOM buttons)
+  if (!document.body.classList.contains('touch')) {
+    const labels = [['inv', 'BAG'], ['quest', 'QUESTS'], ['pause', 'MENU']];
+    G.ui.hudButtons = [];
+    let bx = VW - 4;
+    for (let i = labels.length - 1; i >= 0; i--) {
+      const [id, label] = labels[i];
+      const w = label.length * 5 + 8;
+      bx -= w + 4;
+      const hover = input.mouse.x >= bx && input.mouse.x < bx + w &&
+                    input.mouse.y >= 3 && input.mouse.y < 16;
+      ctx.fillStyle = hover ? '#3a4466' : 'rgba(38,43,68,0.75)';
+      ctx.fillRect(bx, 3, w, 13);
+      ctx.strokeStyle = '#181425'; ctx.lineWidth = 1;
+      ctx.strokeRect(bx + 0.5, 3.5, w - 1, 12);
+      drawText(ctx, label, bx + 4, 12, hover ? '#fee761' : '#8b9bb4');
+      G.ui.hudButtons.push({ id, x: bx, y: 3, w, h: 13 });
+    }
+  }
+  if (G.muted) drawText(ctx, 'MUTED (M)', VW - 58, 26, '#5a6988');
 }
 
 // --- screens -----------------------------------------------------------
@@ -99,12 +118,25 @@ function titleOptions(st) {
   return opts;
 }
 
+function menuRow(cy) {
+  return input.mouse.x > VW / 2 - 70 && input.mouse.x < VW / 2 + 70 &&
+         input.mouse.y > cy - 16 && input.mouse.y < cy + 8;
+}
+
 export function updateTitle() {
   const st = G.ui.title;
   const opts = titleOptions(st);
   if (input.pressed.up) { st.sel = (st.sel + opts.length - 1) % opts.length; sfx('menu'); }
   if (input.pressed.down) { st.sel = (st.sel + 1) % opts.length; sfx('menu'); }
-  if (input.pressed.interact || input.pressed.attack) {
+  let activate = input.pressed.interact || input.pressed.attack;
+  const my0 = Math.round(VH * 0.62);
+  opts.forEach((o, i) => {
+    if (menuRow(my0 + i * 26)) {
+      if (st.sel !== i) { st.sel = i; sfx('menu'); }
+      if (input.mouse.clicked) activate = true;
+    }
+  });
+  if (activate) {
     sfx('menu');
     const o = opts[st.sel];
     if (o.startsWith('Music')) {
@@ -256,7 +288,17 @@ export function updatePause() {
   if (input.pressed.up) { st.sel = (st.sel + opts.length - 1) % opts.length; sfx('menu'); }
   if (input.pressed.down) { st.sel = (st.sel + 1) % opts.length; sfx('menu'); }
   if (input.pressed.pause) return 'Resume';
-  if (input.pressed.interact || input.pressed.attack) {
+  let activate = input.pressed.interact || input.pressed.attack;
+  const py = (VH - 80) / 2;
+  opts.forEach((o, i) => {
+    const cy = py + 36 + i * 12;
+    if (input.mouse.x > VW / 2 - 60 && input.mouse.x < VW / 2 + 60 &&
+        input.mouse.y > cy - 8 && input.mouse.y < cy + 4) {
+      if (st.sel !== i) { st.sel = i; sfx('menu'); }
+      if (input.mouse.clicked) activate = true;
+    }
+  });
+  if (activate) {
     sfx('menu');
     return opts[st.sel];
   }

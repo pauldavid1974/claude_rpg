@@ -111,7 +111,7 @@ export function openQuests() {
 
 export function updateQuests(dt) {
   G.ui.quest.t = Math.min(1, G.ui.quest.t + dt * 6);
-  if (input.pressed.quest || input.pressed.pause || input.pressed.interact) {
+  if (input.pressed.quest || input.pressed.pause || input.pressed.interact || input.mouse.clicked) {
     G.mode = 'play'; sfx('menu');
   }
 }

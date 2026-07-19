@@ -18,7 +18,7 @@ const KEYMAP = {
 export const input = {
   held: {},
   pressed: {},   // true for one frame after keydown
-  mouse: { x: 0, y: 0, clicked: false },
+  mouse: { x: 0, y: 0, clicked: false, rclicked: false, held: false },
   anyKey: false, // true for one frame on any keydown (title screen)
 };
 
@@ -49,7 +49,15 @@ export function initInput(onFirstGesture) {
     input.mouse.x = (e.clientX - r.left) / r.width * VW;
     input.mouse.y = (e.clientY - r.top) / r.height * VH;
   });
-  canvas.addEventListener('mousedown', () => { gesture(); input.mouse.clicked = true; });
+  canvas.addEventListener('mousedown', (e) => {
+    gesture();
+    if (e.button === 0) { input.mouse.clicked = true; input.mouse.held = true; }
+    if (e.button === 2) input.mouse.rclicked = true;
+  });
+  addEventListener('mouseup', (e) => {
+    if (e.button === 0) input.mouse.held = false;
+  });
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   // Touch controls: only revealed on touch devices.
   if ('ontouchstart' in window) {
@@ -72,5 +80,6 @@ function gesture() {
 export function endFrame() {
   input.pressed = {};
   input.mouse.clicked = false;
+  input.mouse.rclicked = false;
   input.anyKey = false;
 }

@@ -18,17 +18,18 @@ Then open:
 
 ## Controls
 
-| Action    | Keys              |
-| --------- | ----------------- |
-| Move      | WASD / arrow keys |
-| Attack    | Space / J         |
-| Interact  | E / Enter         |
-| Inventory | I / Tab           |
-| Quest log | Q                 |
-| Pause     | Esc               |
-| Mute      | M                 |
+| Action    | Keys              | Mouse                              |
+| --------- | ----------------- | ---------------------------------- |
+| Move      | WASD / arrow keys | hold left button to walk to cursor |
+| Attack    | Space / J         | right-click, or hold on a monster  |
+| Interact  | E / Enter         | click NPCs, chests, signs          |
+| Inventory | I / Tab           | BAG button (top right)             |
+| Quest log | Q                 | QUESTS button                      |
+| Pause     | Esc               | MENU button                        |
+| Mute      | M                 | via pause menu                     |
 
-Touch devices get an on-screen d-pad and buttons automatically.
+The game is fully playable with mouse only. Touch devices get an
+on-screen d-pad and buttons automatically.
 
 ## The game
 

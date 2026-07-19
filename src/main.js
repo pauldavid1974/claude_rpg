@@ -7,7 +7,7 @@ import { initAudio, music, sfx, toggleMute, setMuted } from './audio.js';
 import { buildMap } from './maps.js';
 import {
   createPlayer, updatePlayerMovement, updateMonster, updateNpc,
-  spawnMonster, spawnNpc, feetBox, moveEntity,
+  spawnMonster, spawnNpc, feetBox, moveEntity, facePoint,
 } from './entities.js';
 import { startAttack, updateCombat } from './combat.js';
 import { updateParticles, drawParticles, drawFloats, sparkle, dust, addFloat } from './particles.js';
@@ -153,7 +153,6 @@ function tryInteract() {
   for (const n of G.npcs) {
     if (Math.hypot(n.x + 8 - fp.x, n.y + 8 - fp.y) < 13 ||
         Math.hypot(n.x + 8 - (p.x + 8), n.y + 8 - (p.y + 8)) < 18) {
-      n.facePlayer = true;
       talkTo(n);
       return;
     }
@@ -162,6 +161,14 @@ function tryInteract() {
   for (const pr of G.map.props) {
     const px = pr.x * TILE + 8, py = pr.y * TILE + 8;
     if (Math.hypot(px - fp.x, py - fp.y) > 13) continue;
+    interactProp(pr);
+    return;
+  }
+}
+
+function interactProp(pr) {
+  const px = pr.x * TILE + 8, py = pr.y * TILE + 8;
+  {
     if (pr.type === 'sign') {
       say(null, [pr.text]);
       return;
@@ -238,7 +245,8 @@ function loop(ts) {
     }
     case 'gameover': {
       G.ui.gameoverT += dt;
-      if (G.ui.gameoverT > 1.2 && (input.pressed.interact || input.pressed.attack)) respawn();
+      if (G.ui.gameoverT > 1.2 &&
+          (input.pressed.interact || input.pressed.attack || input.mouse.clicked)) respawn();
       break;
     }
   }
@@ -261,6 +269,27 @@ function loop(ts) {
   endFrame();
 }
 
+// HUD buttons (bag/quests/menu) let the game be played mouse-only.
+function hudButtonClick() {
+  for (const b of G.ui.hudButtons || []) {
+    if (input.mouse.x >= b.x && input.mouse.x < b.x + b.w &&
+        input.mouse.y >= b.y && input.mouse.y < b.y + b.h) {
+      if (b.id === 'inv') openInventory();
+      else if (b.id === 'quest') openQuests();
+      else { G.mode = 'pause'; G.ui.pause = { sel: 0 }; sfx('menu'); }
+      return true;
+    }
+  }
+  return false;
+}
+
+function monsterAtCursor(wx, wy) {
+  for (const m of G.monsters) {
+    if (wx >= m.x - 2 && wx <= m.x + m.size + 2 && wy >= m.y - 2 && wy <= m.y + m.size + 2) return m;
+  }
+  return null;
+}
+
 function updatePlay(dt) {
   const p = G.player;
   if (input.pressed.pause) { G.mode = 'pause'; G.ui.pause = { sel: 0 }; sfx('menu'); return; }
@@ -269,7 +298,53 @@ function updatePlay(dt) {
   if (input.pressed.interact) { tryInteract(); if (G.mode !== 'play') return; }
   if (input.pressed.attack) startAttack();
 
-  if (!G.transition) updatePlayerMovement(dt, input.held);
+  // --- mouse controls -------------------------------------------------
+  const wx = G.cam.x + input.mouse.x, wy = G.cam.y + input.mouse.y;
+  const pcx = p.x + 8, pcy = p.y + 11;
+  if (input.mouse.clicked) {
+    if (hudButtonClick()) return;
+    G.ui.mouseArm = true;   // click began in the world: hold now steers
+    // interact with whatever was clicked, if close enough
+    const npc = G.npcs.find(n => wx >= n.x - 2 && wx <= n.x + 18 && wy >= n.y - 2 && wy <= n.y + 18);
+    if (npc && Math.hypot(npc.x + 8 - pcx, npc.y + 8 - pcy) < 26) {
+      facePoint(npc.x + 8, npc.y + 8);
+      talkTo(npc);
+      return;
+    }
+    const prop = G.map.props.find(pr =>
+      wx >= pr.x * TILE - 2 && wx <= pr.x * TILE + 18 && wy >= pr.y * TILE - 2 && wy <= pr.y * TILE + 18);
+    if (prop && Math.hypot(prop.x * TILE + 8 - pcx, prop.y * TILE + 8 - pcy) < 26) {
+      facePoint(prop.x * TILE + 8, prop.y * TILE + 8);
+      interactProp(prop);
+      if (G.mode !== 'play') return;
+    } else if (!monsterAtCursor(wx, wy)) {
+      dust(wx, wy);   // little puff marks the walk target
+    }
+  }
+  if (input.mouse.rclicked) {   // right-click: swing toward the cursor
+    facePoint(wx, wy);
+    startAttack();
+  }
+  if (!input.mouse.held) G.ui.mouseArm = false;
+
+  // movement: keyboard vector, or steer toward the held cursor
+  let mvx = 0, mvy = 0;
+  if (input.held.left) mvx -= 1;
+  if (input.held.right) mvx += 1;
+  if (input.held.up) mvy -= 1;
+  if (input.held.down) mvy += 1;
+  if (!mvx && !mvy && input.mouse.held && G.ui.mouseArm) {
+    const target = monsterAtCursor(wx, wy);
+    if (target && Math.hypot(target.x + target.size / 2 - pcx, target.y + target.size / 2 - pcy) < 30) {
+      facePoint(target.x + target.size / 2, target.y + target.size / 2);
+      startAttack();   // in reach: keep swinging
+    } else if (Math.hypot(wx - pcx, wy - pcy) > 6) {
+      mvx = wx - pcx;
+      mvy = wy - pcy;
+    }
+  }
+
+  if (!G.transition) updatePlayerMovement(dt, mvx, mvy);
 
   // player knockback
   if (p.kbx || p.kby) {
