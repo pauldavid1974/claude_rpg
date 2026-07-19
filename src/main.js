@@ -1,6 +1,6 @@
 // Boot, game loop, world update/draw, map changes, interactions.
 
-import { G, VW, VH, TILE, resetRun } from './state.js';
+import { G, VW, VH, TILE, setView, resetRun } from './state.js';
 import { loadAssets, drawAnim, drawAnimFlash, frameOf } from './assets.js';
 import { initInput, input, endFrame } from './input.js';
 import { initAudio, music, sfx, toggleMute, setMuted } from './audio.js';
@@ -30,19 +30,22 @@ G.ctx = canvas.getContext('2d');
 G.ctx.imageSmoothingEnabled = false;
 
 // Render at an integer number of device pixels per game pixel, so the
-// browser never resamples: the canvas backing store is the final image.
+// browser never resamples, and extend the internal viewport so the canvas
+// fills the whole window: no letterboxing, no stretched pixels.
 function resize() {
   const dpr = window.devicePixelRatio || 1;
-  const fit = Math.min(innerWidth / VW, innerHeight / VH);
-  const z = Math.max(1, Math.floor(fit * dpr));
+  const z = Math.max(1, Math.floor(Math.min(innerWidth * dpr / 320, innerHeight * dpr / 180)));
+  const vw = Math.max(320, Math.ceil(innerWidth * dpr / z));
+  const vh = Math.max(180, Math.ceil(innerHeight * dpr / z));
+  setView(vw, vh);
   G.zoom = z;
-  canvas.width = VW * z;
-  canvas.height = VH * z;
-  const cssW = VW * z / dpr, cssH = VH * z / dpr;
+  canvas.width = vw * z;
+  canvas.height = vh * z;
+  const cssW = vw * z / dpr, cssH = vh * z / dpr;
   canvas.style.width = cssW + 'px';
   canvas.style.height = cssH + 'px';
-  canvas.style.left = (innerWidth - cssW) / 2 + 'px';
-  canvas.style.top = (innerHeight - cssH) / 2 + 'px';
+  canvas.style.left = Math.min(0, (innerWidth - cssW) / 2) + 'px';
+  canvas.style.top = Math.min(0, (innerHeight - cssH) / 2) + 'px';
 }
 addEventListener('resize', resize);
 resize();
@@ -84,8 +87,7 @@ export function changeMap(name, tx, ty) {
   }
   G.player.x = tx * TILE;
   G.player.y = ty * TILE;
-  G.cam.x = clamp(G.player.x - VW / 2, 0, G.map.w * TILE - VW);
-  G.cam.y = clamp(G.player.y - VH / 2, 0, G.map.h * TILE - VH);
+  [G.cam.x, G.cam.y] = camTarget();
   music(G.map.music);
   saveGame();
 }
@@ -302,8 +304,7 @@ function updatePlay(dt) {
   }
 
   // camera follows with lerp
-  const targetX = clamp(p.x + 8 - VW / 2, 0, Math.max(0, G.map.w * TILE - VW));
-  const targetY = clamp(p.y + 8 - VH / 2, 0, Math.max(0, G.map.h * TILE - VH));
+  const [targetX, targetY] = camTarget();
   G.cam.x += (targetX - G.cam.x) * Math.min(1, dt * 8);
   G.cam.y += (targetY - G.cam.y) * Math.min(1, dt * 8);
 
@@ -332,6 +333,16 @@ function updateWorldAmbient(dt) {
 }
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+// Camera target: follow the player clamped to map bounds; maps smaller
+// than the viewport get centered instead.
+function camTarget() {
+  const p = G.player;
+  const mw = G.map.w * TILE, mh = G.map.h * TILE;
+  const tx = mw >= VW ? clamp(p.x + 8 - VW / 2, 0, mw - VW) : -(VW - mw) / 2;
+  const ty = mh >= VH ? clamp(p.y + 8 - VH / 2, 0, mh - VH) : -(VH - mh) / 2;
+  return [tx, ty];
+}
 
 // --- draw ---------------------------------------------------------------
 

@@ -1,7 +1,7 @@
 // Dialogue system: per-character typing, name tag, choices, and the
 // per-NPC scripts that drive the quest flow.
 
-import { G } from './state.js';
+import { G, VW, VH } from './state.js';
 import { input } from './input.js';
 import { sfx } from './audio.js';
 import { drawPanel, drawText } from './ui.js';
@@ -57,7 +57,8 @@ export function updateDialogue(dt) {
 
 export function drawDialogue(ctx) {
   if (!script) return;
-  const x = 24, y = 120, w = 272, h = 52;
+  const w = 272, h = 52;
+  const x = Math.round((VW - w) / 2), y = VH - 60;
   drawPanel(ctx, x, y, w, h);
   if (script.name) {
     drawPanel(ctx, x + 6, y - 10, Math.max(40, script.name.length * 5 + 14), 16);

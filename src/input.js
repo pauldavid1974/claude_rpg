@@ -1,5 +1,7 @@
 // Keyboard + touch input, mapped to logical buttons.
 
+import { VW, VH } from './state.js';
+
 const KEYMAP = {
   ArrowUp: 'up', KeyW: 'up',
   ArrowDown: 'down', KeyS: 'down',
@@ -44,8 +46,8 @@ export function initInput(onFirstGesture) {
   const canvas = document.getElementById('game');
   canvas.addEventListener('mousemove', (e) => {
     const r = canvas.getBoundingClientRect();
-    input.mouse.x = (e.clientX - r.left) / r.width * 320;
-    input.mouse.y = (e.clientY - r.top) / r.height * 180;
+    input.mouse.x = (e.clientX - r.left) / r.width * VW;
+    input.mouse.y = (e.clientY - r.top) / r.height * VH;
   });
   canvas.addEventListener('mousedown', () => { gesture(); input.mouse.clicked = true; });
 

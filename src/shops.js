@@ -1,6 +1,6 @@
 // Shop data and buy/sell UI.
 
-import { G } from './state.js';
+import { G, VW, VH } from './state.js';
 import { input } from './input.js';
 import { sfx } from './audio.js';
 import { ITEMS, sellPrice } from './items.js';
@@ -96,7 +96,8 @@ function sell(slot) {
 }
 
 function layout(list) {
-  const x = 60, y = 14, w = 200;
+  const w = 200;
+  const x = Math.round((VW - w) / 2), y = Math.round((VH - 168) / 2);
   const rows = list.map((_, i) => ({ x: x + 10, y: y + 44 + i * 14, w: w - 20 }));
   const tabs = [{ id: 'buy', x: x + 12, y: y + 28 }, { id: 'sell', x: x + 58, y: y + 28 }];
   return { x, y, w, rows, tabs };
@@ -144,7 +145,7 @@ export function drawShop(ctx) {
   }
   if (st.flashMsg) drawText(ctx, st.flashMsg, x + 10, y + h - 34, '#e43b44');
   else if (st.flash > 0) drawText(ctx, "Can't afford that!", x + 10, y + h - 34, '#e43b44');
-  drawTextC(ctx, 'arrows: move/tab  E: confirm  Esc: leave', 160, y + h + 10, '#8b9bb4');
+  drawTextC(ctx, 'arrows: move/tab  E: confirm  Esc: leave', VW / 2, y + h + 10, '#8b9bb4');
   ctx.restore();
   ctx.globalAlpha = 1;
 }

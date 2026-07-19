@@ -1,6 +1,6 @@
 // Inventory state + grid UI (keyboard and mouse).
 
-import { G } from './state.js';
+import { G, VW, VH } from './state.js';
 import { ITEMS } from './items.js';
 import { input } from './input.js';
 import { sfx } from './audio.js';
@@ -115,7 +115,7 @@ export function updateInventory(dt) {
 
 function layout() {
   const w = 168, h = 150;
-  const mx = 12, my = 15;
+  const mx = Math.round((VW - 300) / 2), my = Math.round((VH - 158) / 2);
   const cells = [];
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     cells.push({ x: mx + 10 + c * 24, y: my + 30 + r * 24 });
@@ -170,7 +170,7 @@ export function drawInventory(ctx) {
   }
   drawText(ctx, 'LV ' + p.level + '  ATK ' + stats.atk + '  DEF ' + stats.def, dx + 8, my + h - 30, '#feae34');
   drawText(ctx, 'HP ' + p.hp + '/' + p.maxHp, dx + 8, my + h - 18, '#f6757a');
-  drawTextC(ctx, 'I / Esc: close', 160, my + h + 10, '#8b9bb4');
+  drawTextC(ctx, 'I / Esc: close', VW / 2, my + h + 10, '#8b9bb4');
   ctx.restore();
   ctx.globalAlpha = 1;
 }

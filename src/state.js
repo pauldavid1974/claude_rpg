@@ -1,8 +1,12 @@
 // Shared game state and constants.  No imports: every module can import this.
 
 export const TILE = 16;
-export const VW = 320;   // internal resolution
-export const VH = 180;
+
+// Internal resolution. At least 320x180; resize() extends it so the view
+// fills the whole window at an integer zoom (no letterboxing).
+export let VW = 320;
+export let VH = 180;
+export function setView(w, h) { VW = w; VH = h; }
 
 export const G = {
   mode: 'title',        // title | play | dialogue | inventory | quests | shop | pause | gameover

@@ -119,13 +119,15 @@ export function updateTitle() {
 // --- title backdrop: parallax moonlit valley ---------------------------
 
 let stars = null;
+let starsW = 0;
 
 function initStars() {
   stars = [];
+  starsW = VW;
   let s = 12345;
   const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
-  for (let i = 0; i < 80; i++) {
-    stars.push({ x: rnd() * VW, y: rnd() * rnd() * 105, big: rnd() < 0.12, ph: rnd() * 7 });
+  for (let i = 0; i < 110; i++) {
+    stars.push({ x: rnd() * VW, y: rnd() * rnd() * (VH * 0.58), big: rnd() < 0.12, ph: rnd() * 7 });
   }
 }
 
@@ -143,23 +145,21 @@ function fillRidge(ctx, drift, base, a1, a2, a3, color) {
   }
 }
 
-const HOUSES = [
-  { x: 38, w: 13, h: 9 }, { x: 55, w: 11, h: 8 }, { x: 70, w: 16, h: 10 },
-  { x: 91, w: 12, h: 8 }, { x: 107, w: 14, h: 9 },
-];
-
 function drawValley(ctx) {
   const t = G.time;
   // sky bands, darkest at the top
-  const bands = [['#0b0d1a', 0], ['#12142a', 42], ['#1a1e3c', 78], ['#252b52', 102], ['#303a66', 116]];
+  const bands = [
+    ['#0b0d1a', 0], ['#12142a', VH * 0.23], ['#1a1e3c', VH * 0.43],
+    ['#252b52', VH * 0.57], ['#303a66', VH * 0.64],
+  ];
   for (let i = 0; i < bands.length; i++) {
-    const [c, y] = bands[i];
-    const y2 = i + 1 < bands.length ? bands[i + 1][1] : 124;
-    ctx.fillStyle = c;
+    const y = Math.round(bands[i][1]);
+    const y2 = Math.round(i + 1 < bands.length ? bands[i + 1][1] : VH * 0.70);
+    ctx.fillStyle = bands[i][0];
     ctx.fillRect(0, y, VW, y2 - y);
   }
   // stars twinkle
-  if (!stars) initStars();
+  if (!stars || starsW !== VW) initStars();
   for (const st of stars) {
     const tw = 0.35 + 0.65 * Math.abs(Math.sin(t * 0.9 + st.ph));
     ctx.globalAlpha = tw;
@@ -173,7 +173,7 @@ function drawValley(ctx) {
   }
   ctx.globalAlpha = 1;
   // moon with soft glow
-  const mx = 250, my = 34;
+  const mx = VW - 70, my = VH * 0.19;
   for (const [r, a] of [[30, 0.05], [22, 0.08], [17, 0.13]]) {
     ctx.globalAlpha = a;
     ctx.fillStyle = '#c0cbdc';
@@ -188,60 +188,24 @@ function drawValley(ctx) {
   }
   // parallax ridges: far drifts least, near drifts most
   const sway = Math.sin(t * 0.07);
-  fillRidge(ctx, sway * 8, 96, 12, 6, 2, '#1b1e33');
-  fillRidge(ctx, sway * 20, 122, 8, 4, 2, '#242a49');
-  // the town, nestled on the valley floor
-  ctx.save();
-  ctx.translate(Math.round(sway * 4), 0);
-  const base = 148;
-  ctx.fillStyle = 'rgba(254,174,52,0.03)';                 // communal warm glow, soft falloff
-  ctx.fillRect(24, base - 24, 114, 28);
-  ctx.fillRect(36, base - 18, 90, 22);
-  ctx.fillRect(48, base - 12, 66, 16);
-  for (const h of HOUSES) {
-    ctx.fillStyle = '#12142a';
-    ctx.fillRect(h.x, base - h.h, h.w, h.h);               // walls
-    ctx.fillStyle = '#1e1830';
-    ctx.fillRect(h.x - 1, base - h.h - 2, h.w + 2, 3);     // eaves
-    ctx.fillRect(h.x + 1, base - h.h - 4, h.w - 2, 2);     // roof ridge
-    ctx.fillStyle = '#feae34';
-    ctx.globalAlpha = 0.16;
-    ctx.fillRect(h.x + 2, base - h.h + 2, 6, 5);           // window glow
-    ctx.globalAlpha = 1;
-    ctx.fillRect(h.x + 3, base - h.h + 3, 2, 2);           // lit window
-    if (h.w > 12) ctx.fillRect(h.x + h.w - 5, base - h.h + 3, 2, 2);
-  }
-  // chapel tower
-  ctx.fillStyle = '#12142a';
-  ctx.fillRect(124, base - 18, 7, 18);
-  ctx.fillRect(126, base - 22, 3, 4);
-  ctx.fillStyle = '#fee761';
-  ctx.fillRect(127, base - 15, 1, 2);
-  // chimney smoke
-  for (let i = 0; i < 4; i++) {
-    const yy = (t * 5 + i * 7) % 24;
-    ctx.globalAlpha = 0.22 * (1 - yy / 24);
-    ctx.fillStyle = '#8b9bb4';
-    ctx.fillRect(Math.round(76 + Math.sin(t + yy * 0.3 + i) * 2), Math.round(base - 12 - yy), 2, 2);
-  }
-  ctx.globalAlpha = 1;
-  ctx.restore();
+  fillRidge(ctx, sway * 8, VH - 84, 12, 6, 2, '#1b1e33');
+  fillRidge(ctx, sway * 20, VH - 58, 8, 4, 2, '#242a49');
   // drifting mist
   ctx.fillStyle = '#8b9bb4';
   for (let i = 0; i < 3; i++) {
     ctx.globalAlpha = 0.055;
     const w = 150 + i * 40;
     const x = ((t * (5 + i * 3) + i * 140) % (VW + w)) - w;
-    ctx.fillRect(Math.round(x), 126 + i * 8, w, 5);
+    ctx.fillRect(Math.round(x), Math.round(VH - 54 + i * 8), w, 5);
   }
   ctx.globalAlpha = 1;
   // foreground meadow + treeline, fastest layer
-  fillRidge(ctx, sway * 34, 162, 4, 3, 1, '#101223');
+  fillRidge(ctx, sway * 34, VH - 18, 4, 3, 1, '#101223');
   const toff = sway * 34;
   ctx.fillStyle = '#101223';
-  for (let i = 0; i < 15; i++) {
+  for (let i = 0; i * 24 < VW + 24; i++) {
     const x = Math.round(((i * 24 - toff) % (VW + 24) + VW + 24) % (VW + 24)) - 12;
-    const y = Math.round(ridge(((x + toff) % VW + VW) % VW, 162, 4, 3, 1));
+    const y = Math.round(ridge(((x + toff) % VW + VW) % VW, VH - 18, 4, 3, 1));
     ctx.fillRect(x + 3, y - 3, 3, 4);
     ctx.fillRect(x + 2, y - 1, 5, 2);
     ctx.fillRect(x + 4, y - 5, 1, 3);
@@ -252,32 +216,35 @@ export function drawTitle(ctx) {
   const st = G.ui.title;
   drawValley(ctx);
   // title in the display face, with a soft golden glow
+  const ty = Math.round(VH * 0.32);
   ctx.textAlign = 'center';
-  ctx.font = '38px "Jacquard 12"';
+  ctx.font = '52px "Jacquard 12"';
   ctx.globalAlpha = 0.25;
   ctx.fillStyle = '#feae34';
-  ctx.fillText('Emberdale', VW / 2 + 1, 52);
-  ctx.fillText('Emberdale', VW / 2 - 1, 50);
+  ctx.fillText('Emberdale', VW / 2 + 2, ty + 1);
+  ctx.fillText('Emberdale', VW / 2 - 2, ty - 1);
   ctx.globalAlpha = 1;
   ctx.fillStyle = '#181425';
-  ctx.fillText('Emberdale', VW / 2 + 2, 53);
+  ctx.fillText('Emberdale', VW / 2 + 3, ty + 3);
   ctx.fillStyle = '#fee761';
-  ctx.fillText('Emberdale', VW / 2, 51);
-  ctx.font = '16px "Jacquard 12"';
+  ctx.fillText('Emberdale', VW / 2, ty);
+  ctx.font = '20px "Jacquard 12"';
   ctx.fillStyle = '#8b9bb4';
-  ctx.fillText('a tiny action rpg', VW / 2, 66);
+  ctx.fillText('a tiny action rpg', VW / 2, ty + 22);
   // menu
   const opts = titleOptions(st);
-  ctx.font = '16px "Jacquard 12"';
+  const my0 = Math.round(VH * 0.62);
+  ctx.font = '22px "Jacquard 12"';
   opts.forEach((o, i) => {
     const on = st.sel === i;
+    const y = my0 + i * 26;
     ctx.fillStyle = '#181425';
-    ctx.fillText(o, VW / 2 + 1, 118 + i * 15);
+    ctx.fillText(o, VW / 2 + 2, y + 2);
     ctx.fillStyle = on ? '#fee761' : '#8b9bb4';
-    ctx.fillText(o, VW / 2, 117 + i * 15);
+    ctx.fillText(o, VW / 2, y);
     if (on) {
-      ctx.fillText('>', VW / 2 - 40, 117 + i * 15);
-      ctx.fillText('<', VW / 2 + 40, 117 + i * 15);
+      ctx.fillText('>', VW / 2 - 64, y);
+      ctx.fillText('<', VW / 2 + 64, y);
     }
   });
   ctx.textAlign = 'left';
@@ -300,12 +267,13 @@ export function drawPause(ctx) {
   ctx.fillStyle = 'rgba(24,20,37,0.7)';
   ctx.fillRect(0, 0, VW, VH);
   const st = G.ui.pause;
-  drawPanel(ctx, 100, 50, 120, 76);
-  drawBigText(ctx, 'PAUSED', VW / 2, 68, '#feae34');
+  const px = (VW - 130) / 2, py = (VH - 80) / 2;
+  drawPanel(ctx, px, py, 130, 78);
+  drawBigText(ctx, 'PAUSED', VW / 2, py + 18, '#feae34');
   const opts = ['Resume', G.muted ? 'Unmute' : 'Mute', 'Restart (new game)'];
   opts.forEach((o, i) => {
     const on = st.sel === i;
-    drawTextC(ctx, (on ? '> ' : '') + o, VW / 2, 86 + i * 12, on ? '#fee761' : '#c0cbdc');
+    drawTextC(ctx, (on ? '> ' : '') + o, VW / 2, py + 36 + i * 12, on ? '#fee761' : '#c0cbdc');
   });
 }
 
@@ -313,10 +281,10 @@ export function drawGameover(ctx, t) {
   ctx.fillStyle = `rgba(24,20,37,${Math.min(0.85, t)})`;
   ctx.fillRect(0, 0, VW, VH);
   if (t > 0.5) {
-    drawBigText(ctx, 'YOU FELL', VW / 2, 80, '#e43b44');
-    drawTextC(ctx, 'The road back is paid in gold...', VW / 2, 98, '#8b9bb4');
+    drawBigText(ctx, 'YOU FELL', VW / 2, VH / 2 - 12, '#e43b44');
+    drawTextC(ctx, 'The road back is paid in gold...', VW / 2, VH / 2 + 6, '#8b9bb4');
     if (t > 1.2 && Math.floor(G.time * 2) % 2) {
-      drawTextC(ctx, 'press E to wake up in Emberdale', VW / 2, 120, '#ffffff');
+      drawTextC(ctx, 'press E to wake up in Emberdale', VW / 2, VH / 2 + 28, '#ffffff');
     }
   }
 }

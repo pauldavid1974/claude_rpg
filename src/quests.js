@@ -1,6 +1,6 @@
 // Quest definitions, progress tracking, and the quest log UI.
 
-import { G } from './state.js';
+import { G, VW, VH } from './state.js';
 import { input } from './input.js';
 import { sfx } from './audio.js';
 import { drawPanel, drawText, drawTextC } from './ui.js';
@@ -121,7 +121,8 @@ export function drawQuests(ctx) {
   ctx.save();
   ctx.translate(0, Math.round((1 - t) * -30));
   ctx.globalAlpha = t;
-  const x = 50, y = 12, w = 220, h = 156;
+  const w = 220, h = 156;
+  const x = Math.round((VW - w) / 2), y = Math.round((VH - h - 12) / 2);
   drawPanel(ctx, x, y, w, h);
   drawText(ctx, 'QUEST LOG', x + 10, y + 13, '#feae34');
   let yy = y + 28;
@@ -142,7 +143,7 @@ export function drawQuests(ctx) {
       yy = drawDesc(ctx, q.desc, x + 18, yy, w - 30) + 10;
     } else yy += 2;
   }
-  drawTextC(ctx, 'Q / Esc: close', 160, y + h + 10, '#8b9bb4');
+  drawTextC(ctx, 'Q / Esc: close', VW / 2, y + h + 10, '#8b9bb4');
   ctx.restore();
   ctx.globalAlpha = 1;
 }
