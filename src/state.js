@@ -27,6 +27,7 @@ export const G = {
   banner: null,      // {text, t}  (level up / quest complete strip)
   ui: {},            // per-menu scratch state
   muted: false,
+  musicOn: true,
   saveTimer: 0,
 };
 

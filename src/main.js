@@ -49,6 +49,7 @@ resize();
 
 async function boot() {
   await loadAssets();
+  await document.fonts.load('16px "Jacquard 12"').catch(() => {});
   initInput(() => {
     initAudio();
     if (G.muted) setMuted(true);

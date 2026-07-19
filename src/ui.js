@@ -91,40 +91,196 @@ export function drawHud(ctx) {
 
 // --- screens -----------------------------------------------------------
 
+import { setMusicEnabled } from './audio.js';
+
+function titleOptions(st) {
+  const opts = st.hasSave ? ['Continue', 'New Game'] : ['New Game'];
+  opts.push('Music: ' + (G.musicOn ? 'On' : 'Off'));
+  return opts;
+}
+
 export function updateTitle() {
   const st = G.ui.title;
-  const opts = st.hasSave ? ['Continue', 'New Game'] : ['New Game'];
-  if (input.pressed.up || input.pressed.down) {
-    st.sel = (st.sel + 1) % opts.length; sfx('menu');
-  }
+  const opts = titleOptions(st);
+  if (input.pressed.up) { st.sel = (st.sel + opts.length - 1) % opts.length; sfx('menu'); }
+  if (input.pressed.down) { st.sel = (st.sel + 1) % opts.length; sfx('menu'); }
   if (input.pressed.interact || input.pressed.attack) {
     sfx('menu');
-    return opts[st.sel];
+    const o = opts[st.sel];
+    if (o.startsWith('Music')) {
+      setMusicEnabled(!G.musicOn);
+      return null;
+    }
+    return o;
   }
   return null;
 }
 
+// --- title backdrop: parallax moonlit valley ---------------------------
+
+let stars = null;
+
+function initStars() {
+  stars = [];
+  let s = 12345;
+  const rnd = () => (s = (s * 1664525 + 1013904223) >>> 0) / 4294967296;
+  for (let i = 0; i < 80; i++) {
+    stars.push({ x: rnd() * VW, y: rnd() * rnd() * 105, big: rnd() < 0.12, ph: rnd() * 7 });
+  }
+}
+
+// ridge height, periodic in x so layers wrap seamlessly
+function ridge(x, base, a1, a2, a3) {
+  const u = x / VW * Math.PI * 2;
+  return base + a1 * Math.sin(u * 2 + 1.7) + a2 * Math.sin(u * 5 + 0.4) + a3 * Math.sin(u * 11 + 3.1);
+}
+
+function fillRidge(ctx, drift, base, a1, a2, a3, color) {
+  ctx.fillStyle = color;
+  for (let x = 0; x < VW; x++) {
+    const y = Math.round(ridge(((x + drift) % VW + VW) % VW, base, a1, a2, a3));
+    ctx.fillRect(x, y, 1, VH - y);
+  }
+}
+
+const HOUSES = [
+  { x: 38, w: 13, h: 9 }, { x: 55, w: 11, h: 8 }, { x: 70, w: 16, h: 10 },
+  { x: 91, w: 12, h: 8 }, { x: 107, w: 14, h: 9 },
+];
+
+function drawValley(ctx) {
+  const t = G.time;
+  // sky bands, darkest at the top
+  const bands = [['#0b0d1a', 0], ['#12142a', 42], ['#1a1e3c', 78], ['#252b52', 102], ['#303a66', 116]];
+  for (let i = 0; i < bands.length; i++) {
+    const [c, y] = bands[i];
+    const y2 = i + 1 < bands.length ? bands[i + 1][1] : 124;
+    ctx.fillStyle = c;
+    ctx.fillRect(0, y, VW, y2 - y);
+  }
+  // stars twinkle
+  if (!stars) initStars();
+  for (const st of stars) {
+    const tw = 0.35 + 0.65 * Math.abs(Math.sin(t * 0.9 + st.ph));
+    ctx.globalAlpha = tw;
+    ctx.fillStyle = '#c0cbdc';
+    ctx.fillRect(Math.round(st.x), Math.round(st.y), 1, 1);
+    if (st.big) {
+      ctx.globalAlpha = tw * 0.5;
+      ctx.fillRect(Math.round(st.x) - 1, Math.round(st.y), 3, 1);
+      ctx.fillRect(Math.round(st.x), Math.round(st.y) - 1, 1, 3);
+    }
+  }
+  ctx.globalAlpha = 1;
+  // moon with soft glow
+  const mx = 250, my = 34;
+  for (const [r, a] of [[30, 0.05], [22, 0.08], [17, 0.13]]) {
+    ctx.globalAlpha = a;
+    ctx.fillStyle = '#c0cbdc';
+    ctx.beginPath(); ctx.arc(mx, my, r, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = '#e6ebf2';
+  ctx.beginPath(); ctx.arc(mx, my, 13, 0, 7); ctx.fill();
+  ctx.fillStyle = '#c0cbdc';
+  for (const [cx, cy, cr] of [[mx - 4, my - 3, 3], [mx + 5, my + 2, 2], [mx - 1, my + 6, 2]]) {
+    ctx.beginPath(); ctx.arc(cx, cy, cr, 0, 7); ctx.fill();
+  }
+  // parallax ridges: far drifts least, near drifts most
+  const sway = Math.sin(t * 0.07);
+  fillRidge(ctx, sway * 8, 96, 12, 6, 2, '#1b1e33');
+  fillRidge(ctx, sway * 20, 122, 8, 4, 2, '#242a49');
+  // the town, nestled on the valley floor
+  ctx.save();
+  ctx.translate(Math.round(sway * 4), 0);
+  const base = 148;
+  ctx.fillStyle = 'rgba(254,174,52,0.03)';                 // communal warm glow, soft falloff
+  ctx.fillRect(24, base - 24, 114, 28);
+  ctx.fillRect(36, base - 18, 90, 22);
+  ctx.fillRect(48, base - 12, 66, 16);
+  for (const h of HOUSES) {
+    ctx.fillStyle = '#12142a';
+    ctx.fillRect(h.x, base - h.h, h.w, h.h);               // walls
+    ctx.fillStyle = '#1e1830';
+    ctx.fillRect(h.x - 1, base - h.h - 2, h.w + 2, 3);     // eaves
+    ctx.fillRect(h.x + 1, base - h.h - 4, h.w - 2, 2);     // roof ridge
+    ctx.fillStyle = '#feae34';
+    ctx.globalAlpha = 0.16;
+    ctx.fillRect(h.x + 2, base - h.h + 2, 6, 5);           // window glow
+    ctx.globalAlpha = 1;
+    ctx.fillRect(h.x + 3, base - h.h + 3, 2, 2);           // lit window
+    if (h.w > 12) ctx.fillRect(h.x + h.w - 5, base - h.h + 3, 2, 2);
+  }
+  // chapel tower
+  ctx.fillStyle = '#12142a';
+  ctx.fillRect(124, base - 18, 7, 18);
+  ctx.fillRect(126, base - 22, 3, 4);
+  ctx.fillStyle = '#fee761';
+  ctx.fillRect(127, base - 15, 1, 2);
+  // chimney smoke
+  for (let i = 0; i < 4; i++) {
+    const yy = (t * 5 + i * 7) % 24;
+    ctx.globalAlpha = 0.22 * (1 - yy / 24);
+    ctx.fillStyle = '#8b9bb4';
+    ctx.fillRect(Math.round(76 + Math.sin(t + yy * 0.3 + i) * 2), Math.round(base - 12 - yy), 2, 2);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+  // drifting mist
+  ctx.fillStyle = '#8b9bb4';
+  for (let i = 0; i < 3; i++) {
+    ctx.globalAlpha = 0.055;
+    const w = 150 + i * 40;
+    const x = ((t * (5 + i * 3) + i * 140) % (VW + w)) - w;
+    ctx.fillRect(Math.round(x), 126 + i * 8, w, 5);
+  }
+  ctx.globalAlpha = 1;
+  // foreground meadow + treeline, fastest layer
+  fillRidge(ctx, sway * 34, 162, 4, 3, 1, '#101223');
+  const toff = sway * 34;
+  ctx.fillStyle = '#101223';
+  for (let i = 0; i < 15; i++) {
+    const x = Math.round(((i * 24 - toff) % (VW + 24) + VW + 24) % (VW + 24)) - 12;
+    const y = Math.round(ridge(((x + toff) % VW + VW) % VW, 162, 4, 3, 1));
+    ctx.fillRect(x + 3, y - 3, 3, 4);
+    ctx.fillRect(x + 2, y - 1, 5, 2);
+    ctx.fillRect(x + 4, y - 5, 1, 3);
+  }
+}
+
 export function drawTitle(ctx) {
   const st = G.ui.title;
+  drawValley(ctx);
+  // title in the display face, with a soft golden glow
+  ctx.textAlign = 'center';
+  ctx.font = '38px "Jacquard 12"';
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = '#feae34';
+  ctx.fillText('Emberdale', VW / 2 + 1, 52);
+  ctx.fillText('Emberdale', VW / 2 - 1, 50);
+  ctx.globalAlpha = 1;
   ctx.fillStyle = '#181425';
-  ctx.fillRect(0, 0, VW, VH);
-  // decorative strip of sprites
-  const t = G.time;
-  drawAnim(ctx, 'slime_idle', frameOf('slime_idle', t), 60, 96);
-  drawAnim(ctx, 'skeleton_walk', frameOf('skeleton_walk', t), 230, 94);
-  drawAnim(ctx, 'bat_fly', frameOf('bat_fly', t), 260, 60 + Math.sin(t * 2) * 4);
-  drawAnim(ctx, 'player_walk_down', frameOf('player_walk_down', t), 152, 92);
-  drawAnim(ctx, 'torch', frameOf('torch', t), 40, 60);
-  drawAnim(ctx, 'torch', frameOf('torch', t + 0.3), 268, 92);
-  drawBigText(ctx, 'E M B E R D A L E', VW / 2, 40, '#feae34');
-  drawTextC(ctx, 'a tiny action rpg', VW / 2, 52, '#8b9bb4');
-  const opts = st.hasSave ? ['Continue', 'New Game'] : ['New Game'];
+  ctx.fillText('Emberdale', VW / 2 + 2, 53);
+  ctx.fillStyle = '#fee761';
+  ctx.fillText('Emberdale', VW / 2, 51);
+  ctx.font = '16px "Jacquard 12"';
+  ctx.fillStyle = '#8b9bb4';
+  ctx.fillText('a tiny action rpg', VW / 2, 66);
+  // menu
+  const opts = titleOptions(st);
+  ctx.font = '16px "Jacquard 12"';
   opts.forEach((o, i) => {
     const on = st.sel === i;
-    drawTextC(ctx, (on ? '> ' : '') + o + (on ? ' <' : ''), VW / 2, 122 + i * 12, on ? '#fee761' : '#c0cbdc');
+    ctx.fillStyle = '#181425';
+    ctx.fillText(o, VW / 2 + 1, 118 + i * 15);
+    ctx.fillStyle = on ? '#fee761' : '#8b9bb4';
+    ctx.fillText(o, VW / 2, 117 + i * 15);
+    if (on) {
+      ctx.fillText('>', VW / 2 - 40, 117 + i * 15);
+      ctx.fillText('<', VW / 2 + 40, 117 + i * 15);
+    }
   });
-  drawTextC(ctx, 'move WASD/arrows  attack Space/J  interact E/Enter', VW / 2, 152, '#5a6988');
-  drawTextC(ctx, 'bag I  quests Q  pause Esc  mute M', VW / 2, 162, '#5a6988');
+  ctx.textAlign = 'left';
 }
 
 export function updatePause() {

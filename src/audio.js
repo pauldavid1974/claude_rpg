@@ -9,6 +9,8 @@ let musicGain = null;
 let musicTimer = null;
 let currentTrack = null;
 
+try { G.musicOn = localStorage.getItem('emberdale_music') !== '0'; } catch (e) { /* default on */ }
+
 export function initAudio() {
   if (ac) return;
   ac = new (window.AudioContext || window.webkitAudioContext)();
@@ -16,8 +18,14 @@ export function initAudio() {
   master.gain.value = 0.5;
   master.connect(ac.destination);
   musicGain = ac.createGain();
-  musicGain.gain.value = 0.42;
+  musicGain.gain.value = G.musicOn ? 0.42 : 0;
   musicGain.connect(master);
+}
+
+export function setMusicEnabled(on) {
+  G.musicOn = on;
+  if (musicGain) musicGain.gain.value = on ? 0.42 : 0;
+  try { localStorage.setItem('emberdale_music', on ? '1' : '0'); } catch (e) { /* ignore */ }
 }
 
 export function setMuted(m) {
