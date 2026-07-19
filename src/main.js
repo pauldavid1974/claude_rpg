@@ -67,6 +67,7 @@ async function boot() {
 
 export function changeMap(name, tx, ty) {
   resetRun();
+  G.ui.goal = null;
   G.map = buildMap(name);
   G.mapName = name;
   for (const p of G.map.props) {
@@ -264,6 +265,7 @@ function loop(ts) {
   }
 
   if (input.pressed.mute) { toggleMute(); saveGame(); }
+  if (G.mode !== 'play') G.ui.goal = null;   // menus/dialogue cancel mouse goals
 
   draw();
   endFrame();
@@ -299,25 +301,22 @@ function updatePlay(dt) {
   if (input.pressed.attack) startAttack();
 
   // --- mouse controls -------------------------------------------------
+  // A click sets a movement goal the player pursues on their own:
+  // a ground point, a monster (walk up and attack), or an NPC/prop
+  // (walk up and interact). Holding the button steers continuously.
   const wx = G.cam.x + input.mouse.x, wy = G.cam.y + input.mouse.y;
   const pcx = p.x + 8, pcy = p.y + 11;
   if (input.mouse.clicked) {
     if (hudButtonClick()) return;
-    G.ui.mouseArm = true;   // click began in the world: hold now steers
-    // interact with whatever was clicked, if close enough
     const npc = G.npcs.find(n => wx >= n.x - 2 && wx <= n.x + 18 && wy >= n.y - 2 && wy <= n.y + 18);
-    if (npc && Math.hypot(npc.x + 8 - pcx, npc.y + 8 - pcy) < 26) {
-      facePoint(npc.x + 8, npc.y + 8);
-      talkTo(npc);
-      return;
-    }
-    const prop = G.map.props.find(pr =>
+    const prop = !npc && G.map.props.find(pr =>
       wx >= pr.x * TILE - 2 && wx <= pr.x * TILE + 18 && wy >= pr.y * TILE - 2 && wy <= pr.y * TILE + 18);
-    if (prop && Math.hypot(prop.x * TILE + 8 - pcx, prop.y * TILE + 8 - pcy) < 26) {
-      facePoint(prop.x * TILE + 8, prop.y * TILE + 8);
-      interactProp(prop);
-      if (G.mode !== 'play') return;
-    } else if (!monsterAtCursor(wx, wy)) {
+    const mon = !npc && !prop && monsterAtCursor(wx, wy);
+    if (npc) G.ui.goal = { type: 'npc', ref: npc };
+    else if (prop) G.ui.goal = { type: 'prop', ref: prop };
+    else if (mon) G.ui.goal = { type: 'monster', ref: mon };
+    else {
+      G.ui.goal = { type: 'point', x: wx, y: wy, follow: true };
       dust(wx, wy);   // little puff marks the walk target
     }
   }
@@ -325,26 +324,66 @@ function updatePlay(dt) {
     facePoint(wx, wy);
     startAttack();
   }
-  if (!input.mouse.held) G.ui.mouseArm = false;
+  const goal = G.ui.goal;
+  if (goal && goal.follow && input.mouse.held) { goal.x = wx; goal.y = wy; }
+  if (goal && !input.mouse.held) goal.follow = false;
 
-  // movement: keyboard vector, or steer toward the held cursor
+  // movement: keyboard vector, or pursue the mouse goal
   let mvx = 0, mvy = 0;
   if (input.held.left) mvx -= 1;
   if (input.held.right) mvx += 1;
   if (input.held.up) mvy -= 1;
   if (input.held.down) mvy += 1;
-  if (!mvx && !mvy && input.mouse.held && G.ui.mouseArm) {
-    const target = monsterAtCursor(wx, wy);
-    if (target && Math.hypot(target.x + target.size / 2 - pcx, target.y + target.size / 2 - pcy) < 30) {
-      facePoint(target.x + target.size / 2, target.y + target.size / 2);
-      startAttack();   // in reach: keep swinging
-    } else if (Math.hypot(wx - pcx, wy - pcy) > 6) {
-      mvx = wx - pcx;
-      mvy = wy - pcy;
+  if (mvx || mvy) {
+    G.ui.goal = null;   // keyboard overrides the mouse goal
+  } else if (goal) {
+    let tx, ty, reach;
+    if (goal.type === 'point') { tx = goal.x; ty = goal.y; reach = 5; }
+    else if (goal.type === 'monster') {
+      const m = goal.ref;
+      if (!G.monsters.includes(m)) { G.ui.goal = null; tx = null; }
+      else { tx = m.x + m.size / 2; ty = m.y + m.size / 2; reach = 28; }
+    } else {
+      const r = goal.ref;
+      tx = goal.type === 'npc' ? r.x + 8 : r.x * TILE + 8;
+      ty = goal.type === 'npc' ? r.y + 8 : r.y * TILE + 8;
+      reach = 24;
+    }
+    if (tx !== null && tx !== undefined) {
+      const d = Math.hypot(tx - pcx, ty - pcy);
+      if (d > reach) {
+        mvx = tx - pcx; mvy = ty - pcy;
+      } else if (goal.type === 'monster') {
+        facePoint(tx, ty);
+        startAttack();   // keep swinging until it dies or we're redirected
+      } else if (goal.type === 'npc') {
+        G.ui.goal = null;
+        facePoint(tx, ty);
+        talkTo(goal.ref);
+        return;
+      } else if (goal.type === 'prop') {
+        G.ui.goal = null;
+        facePoint(tx, ty);
+        interactProp(goal.ref);
+        if (G.mode !== 'play') return;
+      } else {
+        G.ui.goal = null;   // arrived
+      }
     }
   }
 
+  const wasX = p.x, wasY = p.y;
   if (!G.transition) updatePlayerMovement(dt, mvx, mvy);
+
+  // abandon a mouse goal we can't make progress toward (walls etc.)
+  if (G.ui.goal && (mvx || mvy)) {
+    if (Math.hypot(p.x - wasX, p.y - wasY) < 8 * dt) {
+      G.ui.goal.stuck = (G.ui.goal.stuck || 0) + dt;
+      if (G.ui.goal.stuck > 0.5) G.ui.goal = null;
+    } else {
+      G.ui.goal.stuck = 0;
+    }
+  }
 
   // player knockback
   if (p.kbx || p.kby) {
