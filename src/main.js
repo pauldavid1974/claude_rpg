@@ -316,6 +316,9 @@ function updateWorldAmbient(dt) {
     }
     if (cell && cell.base === 'grass_flowers') {
       G.particles.push({ x, y: y - 2, vx: 4, vy: -6, g: 0, life: 0.8, maxLife: 0.8, color: '#fee761', size: 1, twinkle: true });
+    } else if (cell && cell.base.startsWith('grass')) {
+      // swaying grass fleck drifting on the breeze
+      G.particles.push({ x, y, vx: 9, vy: -2, g: 0, life: 0.7, maxLife: 0.7, color: '#63c74d', size: 1, twinkle: true });
     }
   }
 }
