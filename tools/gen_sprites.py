@@ -230,197 +230,219 @@ class Sheet:
 # PLAYER — blue tunic, brown hair, gold buckle.  Feet on row 14.
 # ---------------------------------------------------------------------------
 
+def _stride(frame, fwd, back):
+    """One walking pose: `fwd` foot planted a pixel further down the screen,
+    `back` foot lifted a pixel — a two-pixel stagger reads clearly at 16px."""
+    out = [r[:] for r in frame]
+    for x in range(fwd[0], fwd[1] + 1):      # leading foot reaches lower
+        out[15][x] = "e"
+        out[14][x] = "e"
+    for x in range(back[0] - 1, back[1] + 2):  # trailing foot lifts clear
+        out[14][x] = TRANSPARENT
+    for x in range(back[0], back[1] + 1):
+        out[13][x] = "e"
+    return out
+
+
+def _walk_cycle_facing(stand):
+    """Front/back walk: contact, left stride, contact, right stride."""
+    lift = bob_top(stand, 12)   # torso rides a pixel lower mid-stride
+    return [stand,
+            _stride(lift, (5, 6), (9, 10)),
+            stand,
+            _stride(lift, (9, 10), (5, 6))]
+
+
+def _with_legs(frame, leg_row, boot_row):
+    out = [r[:] for r in frame]
+    out[13] = list(leg_row)
+    out[14] = list(boot_row)
+    return out
+
+
 def build_player():
+    """Hero sprites: three-tone ramps on hair, skin, tunic and leather, one
+    light source top-left, four-frame walk cycles and two-frame swings."""
     down_stand = F(
         "................",
         ".....000000.....",
-        "....0tttttt0....",
-        "...0ttttTTTT0...",
-        "...0TnnnnnnT0...",
-        "...0Tn0nn0nT0...",
+        "....0dddddt0....",
+        "...0ddttttTT0...",
+        "...0dtnnnntT0...",
+        "...0tn0nn0nT0...",
         "....0nnnnnn0....",
-        "....00naan00....",
-        "...0bcbbbbBb0...",
-        "...0bbbbbbBb0...",
-        "...0n0bbbB0n0...",
-        "....0eeyyee0....",
-        "....0TT00TT0....",
+        "....00naaN00....",
+        "...0bbbbbbb10...",
+        "..0nbBBBBBB1n0..",
+        "..0nbBBBBBB1n0..",
+        "..0n0eyyye01n0..",
+        "....0BBBB110....",
         "....0TT00TT0....",
         "....0ee00ee0....",
-        "................",
-    )
-    down_step = F(
-        "................",
-        "................",
-        ".....000000.....",
-        "....0tttttt0....",
-        "...0ttttTTTT0...",
-        "...0TnnnnnnT0...",
-        "...0Tn0nn0nT0...",
-        "....0nnnnnn0....",
-        "....00naan00....",
-        "...0bcbbbbBb0...",
-        "...0n0bbbB0n0...",
-        "....0eeyyee0....",
-        "....0TT00TT0....",
-        "....0ee00TT0....",
-        ".........0ee0...",
         "................",
     )
     up_stand = F(
         "................",
         ".....000000.....",
-        "....0tttttt0....",
-        "...0tttttTTT0...",
-        "...0TTTTTTTT0...",
-        "...0TTTTTTTT0...",
-        "....0TTeeTT0....",
-        "....00bbbb00....",
-        "...0bcbbbbBb0...",
-        "...0bbbbbbBb0...",
-        "...0n0bbbB0n0...",
-        "....0eeeeee0....",
-        "....0TT00TT0....",
+        "....0dddddt0....",
+        "...0ddttttTT0...",
+        "...0dttttttT0...",
+        "...0dttttttT0...",
+        "....0ttttTT0....",
+        "....00TTTT00....",
+        "...0bbbbbbb10...",
+        "..0nbBBBBBB1n0..",
+        "..0nbBBBBBB1n0..",
+        "..0n0eyyye01n0..",
+        "....0BBBB110....",
         "....0TT00TT0....",
         "....0ee00ee0....",
-        "................",
-    )
-    up_step = F(
-        "................",
-        "................",
-        ".....000000.....",
-        "....0tttttt0....",
-        "...0tttttTTT0...",
-        "...0TTTTTTTT0...",
-        "...0TTTTTTTT0...",
-        "....0TTeeTT0....",
-        "....00bbbb00....",
-        "...0bcbbbbBb0...",
-        "...0n0bbbB0n0...",
-        "....0eeeeee0....",
-        "....0TT00TT0....",
-        "....0ee00TT0....",
-        ".........0ee0...",
         "................",
     )
     right_stand = F(
         "................",
-        ".....00000......",
-        "....0ttttt0.....",
-        "...0ttttttT0....",
-        "...0Ttnnnnn0....",
-        "...0Ttnn0n0.....",
-        "....0nnnnn0.....",
-        "....00naa00.....",
-        "....0cbbbB0.....",
-        "....0bbbbB0.....",
-        "....0bn0bB0.....",
-        "....0eeyye0.....",
-        "....0TT0TT0.....",
-        "....0TT0TT0.....",
-        "....0ee0ee0.....",
+        "....000000......",
+        "...0ddddt0......",
+        "..0ddttttT0.....",
+        "..0dtnnnnT0.....",
+        "..0dtn0nnT0.....",
+        "...0tnnnaN0.....",
+        "...00naaN0......",
+        "...0bbbbb10.....",
+        "...0bBBBB10.....",
+        "..0nbBBBB10.....",
+        "..0n0eyye10.....",
+        "...0BBBB110.....",
+        "...0TT0TT0......",
+        "...0ee0ee0......",
         "................",
     )
-    right_a = F(  # stride: legs apart, body bobs down
-        "................",
-        "................",
-        ".....00000......",
-        "....0ttttt0.....",
-        "...0ttttttT0....",
-        "...0Ttnnnnn0....",
-        "...0Ttnn0n0.....",
-        "....0nnnnn0.....",
-        "....00naa00.....",
-        "....0cbbbB0.....",
-        "....0bbbbB0.....",
-        "....0bn0bB0.....",
-        "....0eeyye0.....",
-        "...0TT00TT0.....",
-        "...0ee00ee0.....",
-        "................",
-    )
-    right_b = F(  # stride: front leg reaching
-        "................",
-        "................",
-        ".....00000......",
-        "....0ttttt0.....",
-        "...0ttttttT0....",
-        "...0Ttnnnnn0....",
-        "...0Ttnn0n0.....",
-        "....0nnnnn0.....",
-        "....00naa00.....",
-        "....0cbbbB0.....",
-        "....0bbbbB0.....",
-        "....0bn0bB0.....",
-        "....0eeyye0.....",
-        "....0TT0TT0.....",
-        "....0ee00TT0....",
-        "........0ee0....",
-    )
-    attack_down = F(
-        "................",
-        ".....000000.....",
-        "....0tttttt0....",
-        "...0ttttTTTT0...",
-        "...0TnnnnnnT0...",
-        "...0Tn0nn0nT0...",
-        "....0nnnnnn0....",
-        "....00naan00....",
-        "...0bcbbbb00....",
-        "...0n0bbbb0n0...",
-        "....0bbbbB0y0...",
-        "....0eeyye0650..",
-        "....0TT00T0650..",
-        "....0TT00T0650..",
-        "....0ee00e00500.",
-        "................",
-    )
-    attack_up = F(
-        "............65..",
-        ".....000000.65..",
-        "....0tttttt065..",
-        "...0tttttTTT065.",
-        "...0TTTTTTTT065.",
-        "...0TTTTTTTT0y0.",
-        "....0TTeeTT00n0.",
-        "....00bbbb00b0..",
-        "...0bcbbbbbb0...",
-        "...0bbbbbbBb0...",
-        "...0n0bbbB00....",
-        "....0eeeeee0....",
-        "....0TT00TT0....",
+    # side stride: contact pose with the legs apart, passing pose together
+    right_apart = _with_legs(bob_top(right_stand, 12),
+                             "..0TT00TT0......", "..0ee00ee0......")
+    right_together = _with_legs(bob_top(right_stand, 12),
+                                "...0TTTT0.......", "...0eeee0.......")
+    right_apart[15] = list("..0e00000e0.....")   # heel and toe touch down
+
+    # --- attacks: wind-up then strike -----------------------------------
+    attack_down_a = F(                     # wind-up: blade raised beside
+        "............0000",
+        ".....000000.0650",
+        "....0dddddt00650",
+        "...0ddttttTT0650",
+        "...0dtnnnntT0650",
+        "...0tn0nn0nT0yy0",
+        "....0nnnnnn00nn0",
+        "....00naaN000b0.",
+        "...0bbbbbbb10...",
+        "..0nbBBBBBB1n0..",
+        "..0nbBBBBBB1n0..",
+        "..0n0eyyye01n0..",
+        "....0BBBB110....",
         "....0TT00TT0....",
         "....0ee00ee0....",
         "................",
     )
-    attack_right = F(
+    attack_down_b = F(                     # strike: blade sweeps down-right
         "................",
-        ".....00000......",
-        "....0ttttt0.....",
-        "...0ttttttT0....",
-        "...0Ttnnnnn0....",
-        "...0Ttnn0n0.....",
-        "....0nnnnn0.....",
-        "....00naa00.....",
-        "....0cbbbB0.....",
-        "....0bbbbbb0000.",
-        "....0bbbn0y55560",
-        "....0eeyye000000",
-        "....0TT0TT0.....",
-        "....0TT0TT0.....",
-        "....0ee0ee0.....",
+        ".....000000.....",
+        "....0dddddt0....",
+        "...0ddttttTT0...",
+        "...0dtnnnntT0...",
+        "...0tn0nn0nT0...",
+        "....0nnnnnn0....",
+        "....00naaN00....",
+        "...0bbbbbbb10...",
+        "..0nbBBBBBB1n0..",
+        "..0nbBBBBBB1nn0.",
+        "..0n0eyyye01yy0.",
+        "....0BBBB1106555",
+        "....0TT00TT00000",
+        "....0ee00ee0....",
         "................",
     )
-
+    attack_up_a = F(                       # wind-up: blade cocked back
+        "............0000",
+        ".....000000.0650",
+        "....0dddddt00650",
+        "...0ddttttTT0650",
+        "...0dttttttT0650",
+        "...0dttttttT0yy0",
+        "....0ttttTT00nn0",
+        "....00TTTT000b0.",
+        "...0bbbbbbb10...",
+        "..0nbBBBBBB1n0..",
+        "..0nbBBBBBB1n0..",
+        "..0n0eyyye01n0..",
+        "....0BBBB110....",
+        "....0TT00TT0....",
+        "....0ee00ee0....",
+        "................",
+    )
+    attack_up_b = F(                       # strike: blade thrust overhead
+        "......065 0.....".replace(" ", "5"),
+        "......0650......",
+        "......0650......",
+        "......0yy0......",
+        "....0dd00tTT0...",
+        "...0dttttttT0...",
+        "....0ttttTT0....",
+        "....00TTTT00....",
+        "...0bbbbbbb10...",
+        "..0nbBBBBBB1n0..",
+        "..0nbBBBBBB1n0..",
+        "..0n0eyyye01n0..",
+        "....0BBBB110....",
+        "....0TT00TT0....",
+        "....0ee00ee0....",
+        "................",
+    )
+    attack_right_a = F(                    # wind-up: blade raised
+        "..........0000..",
+        "....000000.0650.",
+        "...0ddddt00.650.",
+        "..0ddttttT00650.",
+        "..0dtnnnnT0.yy0.",
+        "..0dtn0nnT00nn0.",
+        "...0tnnnaN00b0..",
+        "...00naaN00.....",
+        "...0bbbbb10.....",
+        "...0bBBBB10.....",
+        "..0nbBBBB10.....",
+        "..0n0eyye10.....",
+        "...0BBBB110.....",
+        "...0TT0TT0......",
+        "...0ee0ee0......",
+        "................",
+    )
+    attack_right_b = F(                    # strike: blade thrust forward
+        "................",
+        "....000000......",
+        "...0ddddt0......",
+        "..0ddttttT0.....",
+        "..0dtnnnnT0.....",
+        "..0dtn0nnT0.....",
+        "...0tnnnaN0.....",
+        "...00naaN0000000",
+        "...0bbbbb10ny655",
+        "...0bBBBB10y0000",
+        "..0nbBBBB100....",
+        "..0n0eyye10.....",
+        "...0BBBB110.....",
+        "...0TT0TT0......",
+        "...0ee0ee0......",
+        "................",
+    )
     s = Sheet("player", 16)
-    s.add("player_walk_down", [down_stand, down_step, mirror(down_step)], 8)
-    s.add("player_walk_up", [up_stand, up_step, mirror(up_step)], 8)
-    s.add("player_walk_right", [right_stand, right_a, right_b], 8)
-    s.add("player_walk_left", [mirror(right_stand), mirror(right_a), mirror(right_b)], 8)
-    s.add("player_attack_down", [attack_down])
-    s.add("player_attack_up", [attack_up])
-    s.add("player_attack_right", [attack_right])
-    s.add("player_attack_left", [mirror(attack_right)])
+    s.add("player_walk_down", _walk_cycle_facing(down_stand), 9)
+    s.add("player_walk_up", _walk_cycle_facing(up_stand), 9)
+    s.add("player_walk_right", [right_stand, right_apart, right_stand, right_together], 9)
+    s.add("player_walk_left", [mirror(right_stand), mirror(right_apart),
+                               mirror(right_stand), mirror(right_together)], 9)
+    s.add("player_attack_down", [attack_down_a, attack_down_b], 10)
+    s.add("player_attack_up", [attack_up_a, attack_up_b], 10)
+    s.add("player_attack_right", [attack_right_a, attack_right_b], 10)
+    s.add("player_attack_left", [mirror(attack_right_a), mirror(attack_right_b)], 10)
     s.add("player_hurt", [flash_white(down_stand)])
     return s
 
@@ -1388,23 +1410,25 @@ def build_props():
         ".....0oyYyo0....",
         "......0oyo0.....",
     ]
+    # upright picket fence: tall posts with two rails, so it reads as
+    # standing rather than planks lying on the grass
     fence = F(
         "................",
         "................",
-        "................",
-        "................",
-        "......0000......",
-        "......0TTe0.....",
-        "0000000TTe000000",
-        "dddddd0TTe0ddddd",
-        "tttttt0TTe0ttttt",
-        "0000000TTe000000",
-        "......0TTe0.....",
-        "0000000TTe000000",
-        "dddddd0TTe0ddddd",
-        "tttttt0TTe0ttttt",
-        "0000000TTe000000",
-        "................",
+        ".0T0........0T0.",
+        ".0t0........0t0.",
+        ".0t0........0t0.",
+        "00t00000000000t0",
+        "0dtdddddddddddt0",
+        "0Tttttttttttttt0",
+        "00t00000000000t0",
+        ".0t0........0t0.",
+        "00t00000000000t0",
+        "0dtdddddddddddt0",
+        "0Tttttttttttttt0",
+        "00t00000000000t0",
+        ".0T0........0T0.",
+        ".0e0........0e0.",
     )
     barrel = F(
         "................",

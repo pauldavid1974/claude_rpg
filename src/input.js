@@ -59,17 +59,29 @@ export function initInput(onFirstGesture) {
   });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
-  // Touch controls: only revealed on touch devices.
-  if ('ontouchstart' in window) {
+  // Touch: a tap is a click, a drag steers. No on-screen buttons - the
+  // canvas HUD buttons and tap-to-move cover everything.
+  if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     document.body.classList.add('touch');
-    for (const el of document.querySelectorAll('[data-b]')) {
-      const b = el.dataset.b;
-      const on = (e) => { e.preventDefault(); gesture(); input.pressed[b] = true; input.held[b] = true; };
-      const off = (e) => { e.preventDefault(); input.held[b] = false; };
-      el.addEventListener('touchstart', on);
-      el.addEventListener('touchend', off);
-      el.addEventListener('touchcancel', off);
-    }
+    const at = (t) => {
+      const r = canvas.getBoundingClientRect();
+      input.mouse.x = (t.clientX - r.left) / r.width * VW;
+      input.mouse.y = (t.clientY - r.top) / r.height * VH;
+    };
+    canvas.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      gesture();
+      at(e.changedTouches[0]);
+      input.mouse.clicked = true;
+      input.mouse.held = true;
+    }, { passive: false });
+    canvas.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      at(e.changedTouches[0]);
+    }, { passive: false });
+    const end = (e) => { e.preventDefault(); input.mouse.held = false; };
+    canvas.addEventListener('touchend', end, { passive: false });
+    canvas.addEventListener('touchcancel', end, { passive: false });
   }
 }
 

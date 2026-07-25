@@ -20,16 +20,20 @@ Then open:
 
 | Action    | Keys              | Mouse                              |
 | --------- | ----------------- | ---------------------------------- |
-| Move      | WASD / arrow keys | hold left button to walk to cursor |
-| Attack    | Space / J         | right-click, or hold on a monster  |
+| Move      | WASD / arrow keys | click where you want to go         |
+| Attack    | Space / J         | click a monster, or right-click    |
 | Interact  | E / Enter         | click NPCs, chests, signs          |
 | Inventory | I / Tab           | BAG button (top right)             |
 | Quest log | Q                 | QUESTS button                      |
 | Pause     | Esc               | MENU button                        |
 | Mute      | M                 | via pause menu                     |
 
-The game is fully playable with mouse only. Touch devices get an
-on-screen d-pad and buttons automatically.
+The game is fully playable with mouse only — click where you want to go
+and the character walks there, routing around obstacles.
+
+On phones and tablets there are no on-screen buttons: tap to walk, tap a
+monster to attack it, tap an NPC or chest to interact, and use the BAG /
+QUESTS / MENU buttons in the corner.
 
 ## The game
 

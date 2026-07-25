@@ -13,45 +13,10 @@
   html, body { margin:0; padding:0; background:#181425; height:100%; overflow:hidden;
                touch-action:none; -webkit-user-select:none; user-select:none; }
   #game { position:absolute; image-rendering:crisp-edges; image-rendering:pixelated; }
-  .touch-ui { position:fixed; z-index:10; display:none; }
-  body.touch .touch-ui { display:block; }
-  #dpad { left:16px; bottom:16px; width:132px; height:132px; }
-  #dpad .pad { position:absolute; width:44px; height:44px; background:#3a4466aa;
-               border:2px solid #181425; border-radius:8px; box-sizing:border-box; }
-  #dpad .up    { left:44px; top:0; }
-  #dpad .down  { left:44px; bottom:0; }
-  #dpad .left  { left:0; top:44px; }
-  #dpad .right { right:0; top:44px; }
-  #btns { right:16px; bottom:16px; width:120px; height:120px; }
-  #btns .btn { position:absolute; width:52px; height:52px; border-radius:50%;
-               background:#3a4466aa; border:2px solid #181425; color:#c0cbdc;
-               font:bold 16px monospace; text-align:center; line-height:48px;
-               box-sizing:border-box; }
-  #btnA { right:0; bottom:34px; background:#a22633aa !important; }
-  #btnB { right:62px; bottom:0; }
-  #sysbtns { top:12px; right:12px; }
-  #sysbtns .sbtn { display:inline-block; margin-left:8px; padding:6px 10px;
-                   background:#3a4466aa; border:2px solid #181425; border-radius:6px;
-                   color:#c0cbdc; font:bold 12px monospace; }
 </style>
 </head>
 <body>
 <canvas id="game" width="320" height="180"></canvas>
-<div id="dpad" class="touch-ui">
-  <div class="pad up" data-b="up"></div>
-  <div class="pad down" data-b="down"></div>
-  <div class="pad left" data-b="left"></div>
-  <div class="pad right" data-b="right"></div>
-</div>
-<div id="btns" class="touch-ui">
-  <div class="btn" id="btnA" data-b="attack">A</div>
-  <div class="btn" id="btnB" data-b="interact">B</div>
-</div>
-<div id="sysbtns" class="touch-ui">
-  <span class="sbtn" data-b="inv">BAG</span>
-  <span class="sbtn" data-b="quest">QST</span>
-  <span class="sbtn" data-b="pause">MENU</span>
-</div>
 <script type="module" src="src/main.js"></script>
 </body>
 </html>

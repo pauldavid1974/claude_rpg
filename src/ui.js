@@ -102,23 +102,26 @@ export function drawHud(ctx) {
       ctx.globalAlpha = 1;
     }
   }
-  // clickable HUD buttons (touch devices have their own DOM buttons)
-  if (!document.body.classList.contains('touch')) {
+  // clickable / tappable HUD buttons
+  {
+    const touch = document.body.classList.contains('touch');
+    const h = touch ? 20 : 13;
+    const pad = touch ? 8 : 4;
     const labels = [['inv', 'BAG'], ['quest', 'QUESTS'], ['pause', 'MENU']];
     G.ui.hudButtons = [];
     let bx = VW - 4;
     for (let i = labels.length - 1; i >= 0; i--) {
       const [id, label] = labels[i];
-      const w = label.length * 5 + 8;
+      const w = label.length * 5 + pad * 2;
       bx -= w + 4;
       const hover = input.mouse.x >= bx && input.mouse.x < bx + w &&
-                    input.mouse.y >= 3 && input.mouse.y < 16;
-      ctx.fillStyle = hover ? '#3a4466' : 'rgba(38,43,68,0.75)';
-      ctx.fillRect(bx, 3, w, 13);
+                    input.mouse.y >= 3 && input.mouse.y < 3 + h;
+      ctx.fillStyle = hover ? '#3a4466' : 'rgba(38,43,68,0.8)';
+      ctx.fillRect(bx, 3, w, h);
       ctx.strokeStyle = '#181425'; ctx.lineWidth = 1;
-      ctx.strokeRect(bx + 0.5, 3.5, w - 1, 12);
-      drawText(ctx, label, bx + 4, 12, hover ? '#fee761' : '#8b9bb4');
-      G.ui.hudButtons.push({ id, x: bx, y: 3, w, h: 13 });
+      ctx.strokeRect(bx + 0.5, 3.5, w - 1, h - 1);
+      drawText(ctx, label, bx + pad, 3 + h / 2 + 3, hover ? '#fee761' : '#8b9bb4');
+      G.ui.hudButtons.push({ id, x: bx, y: 3, w, h });
     }
   }
   if (G.muted) drawText(ctx, 'MUTED (M)', VW - 58, 26, '#5a6988');

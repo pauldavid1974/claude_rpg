@@ -4,7 +4,7 @@ import { G, VW, VH, TILE, setView, resetRun } from './state.js';
 import { loadAssets, drawAnim, drawAnimFlash, frameOf } from './assets.js';
 import { initInput, input, endFrame } from './input.js';
 import { initAudio, music, sfx, toggleMute, setMuted } from './audio.js';
-import { buildMap } from './maps.js';
+import { buildMap, outsideCell } from './maps.js';
 import {
   createPlayer, updatePlayerMovement, updateMonster, updateNpc,
   spawnMonster, spawnNpc, feetBox, moveEntity, facePoint,
@@ -34,11 +34,19 @@ G.ctx.imageSmoothingEnabled = false;
 // Render at an integer number of device pixels per game pixel, so the
 // browser never resamples, and extend the internal viewport so the canvas
 // fills the whole window: no letterboxing, no stretched pixels.
+//
+// Zoom is chosen so the visible slice of world stays in a sane band no
+// matter the screen shape: never wider/taller than MAX (which is what
+// made phones feel like watching from orbit), never tighter than MIN.
+const MAX_VIEW_W = 384, MAX_VIEW_H = 288;
+const MIN_VIEW_W = 200, MIN_VIEW_H = 140;
+
 function resize() {
   const dpr = window.devicePixelRatio || 1;
-  const z = Math.max(1, Math.floor(Math.min(innerWidth * dpr / 320, innerHeight * dpr / 180)));
-  const vw = Math.max(320, Math.ceil(innerWidth * dpr / z));
-  const vh = Math.max(180, Math.ceil(innerHeight * dpr / z));
+  const dw = innerWidth * dpr, dh = innerHeight * dpr;
+  let z = Math.max(1, Math.ceil(Math.max(dw / MAX_VIEW_W, dh / MAX_VIEW_H)));
+  z = Math.max(1, Math.min(z, Math.floor(dw / MIN_VIEW_W), Math.floor(dh / MIN_VIEW_H)));
+  const vw = Math.ceil(dw / z), vh = Math.ceil(dh / z);
   setView(vw, vh);
   G.zoom = z;
   canvas.width = vw * z;
@@ -592,12 +600,22 @@ function drawWorld(ctx) {
   const x0 = Math.max(0, Math.floor(cx / TILE)), x1 = Math.min(map.w - 1, Math.ceil((cx + VW) / TILE));
   const y0 = Math.max(0, Math.floor(cy / TILE)), y1 = Math.min(map.h - 1, Math.ceil((cy + VH) / TILE));
 
-  for (let y = y0; y <= y1; y++) {
-    for (let x = x0; x <= x1; x++) {
-      const cell = map.render[y][x];
-      const fi = frameOf(cell.base, G.time);
-      drawAnim(ctx, cell.base, fi, x * TILE - cx, y * TILE - cy);
-      if (cell.decal) drawAnim(ctx, cell.decal, 0, x * TILE - cx, y * TILE - cy);
+  // Ground pass. Anything past the map edge repeats the nearest border
+  // tile, so a map smaller than the screen fades into more forest or more
+  // wall instead of a black void.
+  const vx0 = Math.floor(cx / TILE), vx1 = Math.ceil((cx + VW) / TILE);
+  const vy0 = Math.floor(cy / TILE), vy1 = Math.ceil((cy + VH) / TILE);
+  for (let y = vy0; y <= vy1; y++) {
+    for (let x = vx0; x <= vx1; x++) {
+      const inside = x >= 0 && y >= 0 && x < map.w && y < map.h;
+      const cell = inside ? map.render[y][x] : outsideCell(map, x, y);
+      const dx = x * TILE - cx, dy = y * TILE - cy;
+      drawAnim(ctx, cell.base, frameOf(cell.base, G.time), dx, dy);
+      if (cell.decal) drawAnim(ctx, cell.decal, 0, dx, dy);
+      if (!inside && cell.overlay) {
+        drawShadow(ctx, dx + 9, dy + 15, 7, 3, 0.32);
+        drawAnim(ctx, cell.overlay, 0, dx + cell.ox, dy + cell.oy);
+      }
     }
   }
 
@@ -714,9 +732,10 @@ function drawPlayer(ctx, cx, cy) {
   let name, fi = 0;
   if (p.attackT > 0) {
     name = 'player_attack_' + p.attackDir;
+    fi = p.attackT > 0.18 ? 0 : 1;    // wind-up, then the strike
   } else {
     name = 'player_walk_' + p.dir;
-    fi = p.moving ? [0, 1, 0, 2][Math.floor(p.animT * 7) % 4] : 0;
+    fi = p.moving ? Math.floor(p.animT * 9) % 4 : 0;
   }
   drawAnim(ctx, name, fi, p.x - cx, p.y - cy);
 }
