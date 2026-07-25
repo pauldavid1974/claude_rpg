@@ -230,7 +230,7 @@ function titleOptions(st) {
 }
 
 // Shrink a line until it fits the available width.
-function fitFont(ctx, text, size, maxW, minSize = 10) {
+function fitFont(ctx, text, size, maxW, minSize = 8) {
   while (size > minSize) {
     ctx.font = size + 'px "Jacquard 12"';
     if (ctx.measureText(text).width <= maxW) break;
@@ -239,21 +239,41 @@ function fitFont(ctx, text, size, maxW, minSize = 10) {
   return size;
 }
 
-// The title screen sizes its type to the viewport, so it reads the same
-// on a phone as on a desktop instead of running off both edges.
+// The title screen is a measured vertical stack - title, subtitle, menu -
+// scaled down until the whole block fits the viewport and centred as a
+// unit. Sizing off width alone made short landscape windows overlap the
+// subtitle with the menu and push the last option off the bottom.
 function titleLayout(ctx, opts) {
-  const avail = VW - 20;
-  const titleSize = fitFont(ctx, 'Emberdale', Math.min(46, Math.round(VW * 0.20)), avail, 16);
-  const subSize = Math.max(8, Math.round(titleSize * 0.38));
-  let menuSize = Math.max(10, Math.round(titleSize * 0.42));
-  for (const o of opts) menuSize = fitFont(ctx, o, menuSize, avail - 40, 8);
-  const rowH = menuSize + 8;
-  const menuY = Math.round(VH * 0.66);
-  let arrow = 0;
-  ctx.font = menuSize + 'px "Jacquard 12"';
-  for (const o of opts) arrow = Math.max(arrow, ctx.measureText(o).width / 2 + menuSize * 0.7);
-  return { titleSize, subSize, menuSize, rowH, menuY, arrow,
-           titleY: Math.round(VH * 0.40) };
+  const availW = VW - 24;
+  const availH = VH - 14;
+  let size = fitFont(ctx, 'Emberdale', Math.min(46, Math.round(VW * 0.20)), availW, 13);
+
+  for (;;) {
+    const subSize = Math.max(7, Math.round(size * 0.38));
+    let menuSize = Math.max(8, Math.round(size * 0.40));
+    for (const o of opts) menuSize = fitFont(ctx, o, menuSize, availW - 40, 7);
+    const rowH = Math.round(menuSize * 1.55);
+    const gapSub = Math.round(size * 0.22);
+    const gapMenu = Math.round(size * 0.6);
+    const total = size + gapSub + subSize + gapMenu + opts.length * rowH;
+
+    if (total <= availH || size <= 13) {
+      const top = Math.max(4, Math.round((VH - total) * 0.42));
+      ctx.font = menuSize + 'px "Jacquard 12"';
+      let arrow = 0;
+      for (const o of opts) {
+        arrow = Math.max(arrow, ctx.measureText(o).width / 2 + menuSize * 0.85);
+      }
+      return {
+        titleSize: size, subSize, menuSize, rowH,
+        titleY: top + size,
+        subY: top + size + gapSub + subSize,
+        menuY: top + size + gapSub + subSize + gapMenu + menuSize,
+        arrow: Math.min(arrow, VW / 2 - 6),
+      };
+    }
+    size--;
+  }
 }
 
 export function updateTitle() {
@@ -399,8 +419,10 @@ export function drawTitle(ctx) {
   ctx.fillText('Emberdale', VW / 2, L.titleY);
 
   ctx.font = L.subSize + 'px "Jacquard 12"';
+  ctx.fillStyle = '#181425';
+  ctx.fillText('a tiny action rpg', VW / 2 + 1, L.subY + 1);
   ctx.fillStyle = '#8b9bb4';
-  ctx.fillText('a tiny action rpg', VW / 2, L.titleY + L.subSize + 6);
+  ctx.fillText('a tiny action rpg', VW / 2, L.subY);
 
   ctx.font = L.menuSize + 'px "Jacquard 12"';
   opts.forEach((o, i) => {
