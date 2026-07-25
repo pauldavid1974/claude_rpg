@@ -150,9 +150,31 @@ function titleOptions(st) {
   return opts;
 }
 
-function menuRow(cy) {
-  return input.mouse.x > VW / 2 - 70 && input.mouse.x < VW / 2 + 70 &&
-         input.mouse.y > cy - 16 && input.mouse.y < cy + 8;
+// Shrink a line until it fits the available width.
+function fitFont(ctx, text, size, maxW, minSize = 10) {
+  while (size > minSize) {
+    ctx.font = size + 'px "Jacquard 12"';
+    if (ctx.measureText(text).width <= maxW) break;
+    size--;
+  }
+  return size;
+}
+
+// The title screen sizes its type to the viewport, so it reads the same
+// on a phone as on a desktop instead of running off both edges.
+function titleLayout(ctx, opts) {
+  const avail = VW - 20;
+  const titleSize = fitFont(ctx, 'Emberdale', Math.min(46, Math.round(VW * 0.20)), avail, 16);
+  const subSize = Math.max(8, Math.round(titleSize * 0.38));
+  let menuSize = Math.max(10, Math.round(titleSize * 0.42));
+  for (const o of opts) menuSize = fitFont(ctx, o, menuSize, avail - 40, 8);
+  const rowH = menuSize + 8;
+  const menuY = Math.round(VH * 0.66);
+  let arrow = 0;
+  ctx.font = menuSize + 'px "Jacquard 12"';
+  for (const o of opts) arrow = Math.max(arrow, ctx.measureText(o).width / 2 + menuSize * 0.7);
+  return { titleSize, subSize, menuSize, rowH, menuY, arrow,
+           titleY: Math.round(VH * 0.40) };
 }
 
 export function updateTitle() {
@@ -161,9 +183,11 @@ export function updateTitle() {
   if (input.pressed.up) { st.sel = (st.sel + opts.length - 1) % opts.length; sfx('menu'); }
   if (input.pressed.down) { st.sel = (st.sel + 1) % opts.length; sfx('menu'); }
   let activate = input.pressed.interact || input.pressed.attack;
-  const my0 = Math.round(VH * 0.62);
+  const L = titleLayout(G.ctx, opts);
   opts.forEach((o, i) => {
-    if (menuRow(my0 + i * 26)) {
+    const cy = L.menuY + i * L.rowH;
+    if (input.mouse.x > VW / 2 - L.arrow - 10 && input.mouse.x < VW / 2 + L.arrow + 10 &&
+        input.mouse.y > cy - L.menuSize && input.mouse.y < cy + L.rowH - L.menuSize) {
       if (st.sel !== i) { st.sel = i; sfx('menu'); }
       if (input.mouse.clicked) activate = true;
     }
@@ -237,7 +261,7 @@ function drawValley(ctx) {
   }
   ctx.globalAlpha = 1;
   // moon with soft glow
-  const mx = VW - 70, my = VH * 0.19;
+  const mx = VW - 42, my = VH * 0.15;
   for (const [r, a] of [[30, 0.05], [22, 0.08], [17, 0.13]]) {
     ctx.globalAlpha = a;
     ctx.fillStyle = '#c0cbdc';
@@ -279,36 +303,37 @@ function drawValley(ctx) {
 export function drawTitle(ctx) {
   const st = G.ui.title;
   drawValley(ctx);
-  // title in the display face, with a soft golden glow
-  const ty = Math.round(VH * 0.32);
+  const opts = titleOptions(st);
+  const L = titleLayout(ctx, opts);
   ctx.textAlign = 'center';
-  ctx.font = '52px "Jacquard 12"';
+
+  ctx.font = L.titleSize + 'px "Jacquard 12"';
+  const off = Math.max(1, Math.round(L.titleSize / 24));
   ctx.globalAlpha = 0.25;
   ctx.fillStyle = '#feae34';
-  ctx.fillText('Emberdale', VW / 2 + 2, ty + 1);
-  ctx.fillText('Emberdale', VW / 2 - 2, ty - 1);
+  ctx.fillText('Emberdale', VW / 2 + off, L.titleY + off / 2);
+  ctx.fillText('Emberdale', VW / 2 - off, L.titleY - off);
   ctx.globalAlpha = 1;
   ctx.fillStyle = '#181425';
-  ctx.fillText('Emberdale', VW / 2 + 3, ty + 3);
+  ctx.fillText('Emberdale', VW / 2 + off, L.titleY + off);
   ctx.fillStyle = '#fee761';
-  ctx.fillText('Emberdale', VW / 2, ty);
-  ctx.font = '20px "Jacquard 12"';
+  ctx.fillText('Emberdale', VW / 2, L.titleY);
+
+  ctx.font = L.subSize + 'px "Jacquard 12"';
   ctx.fillStyle = '#8b9bb4';
-  ctx.fillText('a tiny action rpg', VW / 2, ty + 22);
-  // menu
-  const opts = titleOptions(st);
-  const my0 = Math.round(VH * 0.62);
-  ctx.font = '22px "Jacquard 12"';
+  ctx.fillText('a tiny action rpg', VW / 2, L.titleY + L.subSize + 6);
+
+  ctx.font = L.menuSize + 'px "Jacquard 12"';
   opts.forEach((o, i) => {
     const on = st.sel === i;
-    const y = my0 + i * 26;
+    const y = L.menuY + i * L.rowH;
     ctx.fillStyle = '#181425';
-    ctx.fillText(o, VW / 2 + 2, y + 2);
+    ctx.fillText(o, VW / 2 + 1, y + 1);
     ctx.fillStyle = on ? '#fee761' : '#8b9bb4';
     ctx.fillText(o, VW / 2, y);
     if (on) {
-      ctx.fillText('>', VW / 2 - 64, y);
-      ctx.fillText('<', VW / 2 + 64, y);
+      ctx.fillText('>', VW / 2 - L.arrow, y);
+      ctx.fillText('<', VW / 2 + L.arrow, y);
     }
   });
   ctx.textAlign = 'left';

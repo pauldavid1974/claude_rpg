@@ -446,13 +446,12 @@ export function buildMap(name) {
   };
 }
 
-// Cell to draw beyond the map edge: same kind of ground as the nearest
-// border tile, but re-rolled at the real coordinates so the surrounding
-// forest keeps varying instead of repeating one row.
+// Cell to draw beyond the map edge. The corner tile is always border
+// material - forest outside, wall inside - so sampling it avoids tiling a
+// door or a road off into the distance. Trees are re-rolled at the real
+// coordinates so the surrounding wood keeps varying.
 export function outsideCell(map, x, y) {
-  const cx = Math.max(0, Math.min(map.w - 1, x));
-  const cy = Math.max(0, Math.min(map.h - 1, y));
-  const edge = map.render[cy][cx];
+  const edge = map.render[0][0];
   if (!edge.overlay) return edge;
   return {
     base: ['grass_1', 'grass_2', 'grass_3'][Math.floor(hash2(x, y, 3) * 3)],
