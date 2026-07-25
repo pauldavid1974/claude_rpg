@@ -1,7 +1,7 @@
 // Melee combat, damage, projectiles, drops and pickups.
 
 import { G, TILE } from './state.js';
-import { feetBox, overlaps, playerStats } from './entities.js';
+import { feetBox, overlaps, playerStats, breakPoise } from './entities.js';
 import { sfx } from './audio.js';
 import { spawnPix, spawnEffect, addFloat, sparkle } from './particles.js';
 import { addItem } from './inventory.js';
@@ -11,7 +11,7 @@ export function xpNeed(level) { return 12 + level * 8; }
 
 export function startAttack() {
   const p = G.player;
-  if (p.attackT > 0) return;
+  if (p.attackT > 0 || p.dodgeT > 0) return;
   p.attackT = 0.26;
   p.attackDir = p.dir;
   p.swingId = (p.swingId || 0) + 1;
@@ -46,7 +46,8 @@ export function updateCombat(dt) {
       if (overlaps(hb, mb)) {
         m.lastHitSwing = p.swingId;
         const ang = Math.atan2((m.y + m.size / 2) - (p.y + 8), (m.x + m.size / 2) - (p.x + 8));
-        hitMonster(m, playerStats().atk, ang);
+        const st = playerStats();
+        hitMonster(m, st.atk, ang, st.poise);
       }
     }
   }
@@ -54,17 +55,24 @@ export function updateCombat(dt) {
   updatePickups(dt);
 }
 
-export function hitMonster(m, dmg, ang) {
+export function hitMonster(m, dmg, ang, poiseDmg = 1) {
+  // a staggered enemy is wide open
+  const staggered = m.staggerT > 0;
+  if (staggered) dmg = Math.round(dmg * 1.5);
   m.hp -= dmg;
   m.hurtT = 0.15;
   const kb = m.type === 'brute' ? 40 : m.type === 'boss' ? 15 : 120;
   m.kbx = Math.cos(ang) * kb;
   m.kby = Math.sin(ang) * kb;
   sfx('slash_hit');
-  G.hitstop = 0.05;
-  G.shake = Math.max(G.shake, 2.5);
-  addFloat('' + dmg, m.x + m.size / 2, m.y - 2, '#ffffff');
+  G.hitstop = staggered ? 0.08 : 0.05;
+  G.shake = Math.max(G.shake, staggered ? 4 : 2.5);
+  addFloat('' + dmg, m.x + m.size / 2, m.y - 2, staggered ? '#fee761' : '#ffffff');
   spawnPix(m.x + m.size / 2, m.y + m.size / 2, '#ffffff', 5, 40, 0.25);
+  if (m.hp > 0 && breakPoise(m, poiseDmg)) {
+    addFloat('STAGGER', m.x + m.size / 2, m.y - 10, '#fee761');
+    G.hitstop = 0.12;
+  }
   if (m.hp <= 0) killMonster(m);
 }
 

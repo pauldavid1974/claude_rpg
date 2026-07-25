@@ -157,6 +157,7 @@ export function drawDialogue(ctx) {
     yy += 10;
   }
   const full = chars >= script.pages[page].length;
+  G.ui.dlgButtons = full && showChoices ? btns : null;
   if (full && showChoices) {
     btns.forEach((b, i) => {
       drawSquishButton(ctx, b.x, b.y, b.w, b.h, b.label, {

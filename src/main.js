@@ -8,8 +8,9 @@ import { buildMap, outsideCell } from './maps.js';
 import {
   createPlayer, updatePlayerMovement, updateMonster, updateNpc,
   spawnMonster, spawnNpc, feetBox, moveEntity, facePoint,
+  startDodge, canDodge, monsterAttackBox, attackProfile, DODGE,
 } from './entities.js';
-import { startAttack, updateCombat } from './combat.js';
+import { startAttack, updateCombat, hitMonster } from './combat.js';
 import { routeTo, feetCenter } from './pathfind.js';
 import { drawLighting, drawGrade, drawShadow } from './lighting.js';
 import { updateParticles, drawParticles, drawFloats, sparkle, dust, addFloat } from './particles.js';
@@ -291,11 +292,35 @@ function hudButtonClick() {
       pressKey('hud_' + b.id);
       if (b.id === 'inv') openInventory();
       else if (b.id === 'quest') openQuests();
+      else if (b.id === 'dodge') dodgeNow();
       else { G.mode = 'pause'; G.ui.pause = { sel: 0 }; sfx('menu'); }
       return true;
     }
   }
   return false;
+}
+
+// Roll the way you're heading: the keyboard vector if there is one, else
+// away along the facing.  Cancels any click-to-move goal.
+function dodgeNow() {
+  const p = G.player;
+  let dx = 0, dy = 0;
+  if (input.held.left) dx -= 1;
+  if (input.held.right) dx += 1;
+  if (input.held.up) dy -= 1;
+  if (input.held.down) dy += 1;
+  if (!dx && !dy) {
+    const goal = G.ui.goal;
+    if (goal && goal.path && goal.path.length) {
+      const fc = feetCenter(p);
+      dx = goal.path[0].x - fc.x; dy = goal.path[0].y - fc.y;
+    } else {
+      dx = p.dir === 'left' ? -1 : p.dir === 'right' ? 1 : 0;
+      dy = p.dir === 'up' ? -1 : p.dir === 'down' ? 1 : 0;
+    }
+  }
+  if (!dx && !dy) dy = 1;
+  if (startDodge(Math.atan2(dy, dx))) G.ui.goal = null;
 }
 
 function monsterAtCursor(wx, wy) {
@@ -370,6 +395,7 @@ function updatePlay(dt) {
   if (input.pressed.quest) { openQuests(); return; }
   if (input.pressed.interact) { tryInteract(); if (G.mode !== 'play') return; }
   if (input.pressed.attack) startAttack();
+  if (input.pressed.dodge) dodgeNow();
 
   // --- mouse controls -------------------------------------------------
   // A click sets a movement goal the player walks to on their own, routed
@@ -638,6 +664,9 @@ function drawWorld(ctx) {
     else if (ov === 'bush') drawShadow(ctx, sx + 8, sy + 13, 6, 2.5, 0.30);
     else if (ov === 'stone') drawShadow(ctx, sx + 8, sy + 14, 6, 2.5, 0.30);
   }
+  // wind-up markers sit on the ground, under everything that stands on it
+  for (const m of G.monsters) drawTelegraph(ctx, m, cx, cy);
+
   for (const n of G.npcs) drawShadow(ctx, n.x + 8 - cx, n.y + 15 - cy, 5);
   for (const m of G.monsters) {
     if (m.type === 'bat') { drawShadow(ctx, m.x + 8 - cx, m.y + 20 - cy, 4, 1.6, 0.20); continue; }
@@ -725,8 +754,48 @@ function questMarker(n) {
   return null;
 }
 
+// A wind-up paints the ground it is about to cover: an outline that fills
+// from the middle out, going gold on the last beat before the strike.
+// Roll out of it, or eat it.
+function drawTelegraph(ctx, m, cx, cy) {
+  const A = attackProfile(m);
+  if (!A || (m.atkPhase !== 'wind' && m.atkPhase !== 'strike')) return;
+  const b = monsterAttackBox(m);
+  const ex = Math.round(b.x + b.w / 2 - cx), ey = Math.round(b.y + b.h / 2 - cy + 3);
+  const rx = b.w / 2 + 2, ry = b.h / 2 * 0.62 + 1;
+  ctx.save();
+  if (m.atkPhase === 'wind') {
+    const k = Math.max(0, Math.min(1, 1 - m.atkT / A.wind));
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = '#e43b44';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(ex + 0.5, ey + 0.5, rx, ry, 0, 0, 7); ctx.stroke();
+    ctx.globalAlpha = 0.22 + 0.34 * k;
+    ctx.fillStyle = k > 0.82 ? '#fee761' : '#e43b44';
+    ctx.beginPath(); ctx.ellipse(ex, ey, rx * k, ry * k, 0, 0, 7); ctx.fill();
+  } else {
+    const k = Math.max(0, m.atkT / A.strike);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.55 * k;
+    ctx.fillStyle = '#ffe9b0';
+    ctx.beginPath(); ctx.ellipse(ex, ey, rx * (1.1 + 0.3 * (1 - k)), ry * 1.1, 0, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+
 function drawPlayer(ctx, cx, cy) {
   const p = G.player;
+  // the roll: quarter-turn tumble, so the pixels stay exact
+  if (p.dodgeT > 0) {
+    const k = 1 - p.dodgeT / DODGE.time;
+    ctx.save();
+    ctx.translate(Math.round(p.x - cx) + 8, Math.round(p.y - cy) + 8);
+    ctx.rotate(Math.floor(k * 5) % 4 * Math.PI / 2);
+    ctx.translate(-8, -8);
+    drawAnim(ctx, 'player_walk_' + p.dir, 1, 0, 0);
+    ctx.restore();
+    return;
+  }
   if (p.iframes > 0 && Math.floor(G.time * 14) % 2 && G.mode === 'play') {
     drawAnimFlash(ctx, 'player_hurt', 0, p.x - cx, p.y - cy, '#ffffff');
     return;
@@ -744,14 +813,38 @@ function drawPlayer(ctx, cx, cy) {
 
 function drawMonster(ctx, m, cx, cy) {
   let name = m.anim;
-  if (m.type === 'boss' && (m.telegraphT > 0 || m.lungeT > 0)) name = 'boss_attack';
+  if (m.type === 'boss' && (m.telegraphT > 0 || m.lungeT > 0 || m.atkPhase !== 'none')) name = 'boss_attack';
   const fi = frameOf(name, G.time + m.homeX * 0.07);
+  // wind-up rears back, the strike lunges through
+  let ox = 0, oy = 0;
+  if (m.atkPhase === 'wind') {
+    const k = 1 - m.atkT / (attackProfile(m).wind || 1);
+    ox = -Math.cos(m.atkAng) * 2 * k;
+    oy = -Math.sin(m.atkAng) * 2 * k;
+  } else if (m.atkPhase === 'strike') {
+    ox = Math.cos(m.atkAng) * 2;
+    oy = Math.sin(m.atkAng) * 2;
+  } else if (m.staggerT > 0) {
+    ox = Math.sin(G.time * 34) * 1.5;      // reeling
+    oy = -1;
+  }
+  const dx = m.x + ox - cx, dy = m.y + oy - cy;
   if (m.hurtT > 0 && Math.floor(G.time * 20) % 2) {
-    drawAnimFlash(ctx, name, fi, m.x - cx, m.y - cy, '#ffffff', m.flip);
-  } else if (m.telegraphT > 0 && Math.floor(G.time * 10) % 2) {
-    drawAnimFlash(ctx, name, fi, m.x - cx, m.y - cy, '#ff0044', m.flip);
+    drawAnimFlash(ctx, name, fi, dx, dy, '#ffffff', m.flip);
+  } else if (m.staggerT > 0 && Math.floor(G.time * 16) % 2) {
+    drawAnimFlash(ctx, name, fi, dx, dy, '#fee761', m.flip);
+  } else if ((m.telegraphT > 0 || m.atkPhase === 'wind') && Math.floor(G.time * 12) % 2) {
+    drawAnimFlash(ctx, name, fi, dx, dy, '#ff0044', m.flip);
   } else {
-    drawAnim(ctx, name, fi, m.x - cx, m.y - cy, m.flip);
+    drawAnim(ctx, name, fi, dx, dy, m.flip);
+  }
+  if (m.staggerT > 0) {                     // stars over a broken guard
+    for (let i = 0; i < 3; i++) {
+      const a = G.time * 5 + i * 2.1;
+      ctx.fillStyle = '#fee761';
+      ctx.fillRect(Math.round(dx + m.size / 2 + Math.cos(a) * 5),
+                   Math.round(dy - 3 + Math.sin(a) * 2), 1, 1);
+    }
   }
   // boss hp bar
   if (m.type === 'boss') {
@@ -762,5 +855,5 @@ function drawMonster(ctx, m, cx, cy) {
   }
 }
 
-window.EMBER = { G, changeMap, dialogueState };  // debug/testing handle
+window.EMBER = { G, changeMap, dialogueState, spawnMonster, startDodge, hitMonster };  // debug/testing handle
 boot();

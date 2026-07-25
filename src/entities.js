@@ -3,6 +3,8 @@
 import { G, TILE } from './state.js';
 import { isSolidAt } from './maps.js';
 import { damagePlayer, monsterShoot } from './combat.js';
+import { sfx } from './audio.js';
+import { dust, spawnPix } from './particles.js';
 
 // --- collision helpers -------------------------------------------------
 
@@ -60,8 +62,36 @@ export function createPlayer() {
     weapon: 'dagger', armor: null,
     inv: [{ id: 'dagger', n: 1 }, { id: 'potion', n: 2 }],
     attackT: 0, attackDir: 'down', iframes: 0,
+    dodgeT: 0, dodgeCd: 0, dodgeAng: 0,
     speed: 72,
   };
+}
+
+// --- dodge roll ---------------------------------------------------------
+// A short burst along one direction with invulnerability over most of it,
+// then a cooldown: the answer to a telegraphed wind-up.
+
+export const DODGE = { time: 0.30, iframes: 0.24, cd: 0.42, speed: 230 };
+
+export function canDodge() {
+  const p = G.player;
+  return p.dodgeT <= 0 && p.dodgeCd <= 0;
+}
+
+export function startDodge(ang) {
+  const p = G.player;
+  if (!canDodge()) return false;
+  p.dodgeT = DODGE.time;
+  p.dodgeCd = DODGE.time + DODGE.cd;
+  p.dodgeAng = ang;
+  p.iframes = Math.max(p.iframes, DODGE.iframes);
+  p.attackT = 0;
+  p.kbx = p.kby = 0;
+  if (Math.abs(Math.cos(ang)) > Math.abs(Math.sin(ang))) p.dir = Math.cos(ang) < 0 ? 'left' : 'right';
+  else p.dir = Math.sin(ang) < 0 ? 'up' : 'down';
+  sfx('dodge');
+  dust(p.x + 8, p.y + 15);
+  return true;
 }
 
 export function playerStats() {
@@ -71,12 +101,27 @@ export function playerStats() {
   return {
     atk: 1 + Math.floor((p.level - 1) / 2) + wAtk,
     def: aDef,
+    // heavier steel rocks an enemy harder
+    poise: p.weapon === 'sword' ? 1.6 : p.weapon === 'greatsword' ? 2.8 : 1,
   };
 }
 
 // dx/dy: desired movement vector (any magnitude; normalized here).
 export function updatePlayerMovement(dt, dx, dy) {
   const p = G.player;
+  if (p.dodgeCd > 0) p.dodgeCd -= dt;
+  if (p.dodgeT > 0) {
+    p.dodgeT -= dt;
+    const k = Math.max(0, p.dodgeT / DODGE.time);
+    const spd = DODGE.speed * (0.3 + 0.7 * k);
+    moveEntity(p, Math.cos(p.dodgeAng) * spd * dt, 0);
+    moveEntity(p, 0, Math.sin(p.dodgeAng) * spd * dt);
+    if (Math.random() < dt * 22) dust(p.x + 8, p.y + 14);
+    p.moving = false;
+    p.animT = 0;
+    if (p.iframes > 0) p.iframes -= dt;
+    return;
+  }
   p.moving = (dx || dy) && p.attackT <= 0;
   if (p.moving) {
     if (Math.abs(dx) > Math.abs(dy)) p.dir = dx < 0 ? 'left' : 'right';
@@ -104,24 +149,56 @@ export function facePoint(wx, wy) {
 // --- monsters ----------------------------------------------------------
 
 const MONSTER_STATS = {
-  slime:    { hp: 6,  atk: 2, xp: 4,  speed: 55, anim: 'slime_idle',    die: 'slime_die',    gold: [1, 4] },
-  skeleton: { hp: 12, atk: 3, xp: 8,  speed: 34, anim: 'skeleton_walk', die: 'skeleton_die', gold: [3, 7] },
-  bat:      { hp: 5,  atk: 2, xp: 5,  speed: 62, anim: 'bat_fly',       die: 'bat_die',      gold: [2, 5] },
-  archer:   { hp: 9,  atk: 3, xp: 9,  speed: 40, anim: 'archer_idle',   die: 'archer_die',   gold: [4, 9] },
-  brute:    { hp: 26, atk: 5, xp: 18, speed: 26, anim: 'brute_walk',    die: 'brute_die',    gold: [8, 16] },
-  boss:     { hp: 90, atk: 6, xp: 120, speed: 30, anim: 'boss_idle',    die: 'boss_die',     gold: [50, 80] },
+  slime:    { hp: 6,  atk: 2, xp: 4,  speed: 55, poise: 2,  anim: 'slime_idle',    die: 'slime_die',    gold: [1, 4] },
+  skeleton: { hp: 12, atk: 3, xp: 8,  speed: 34, poise: 3,  anim: 'skeleton_walk', die: 'skeleton_die', gold: [3, 7] },
+  bat:      { hp: 5,  atk: 2, xp: 5,  speed: 62, poise: 1,  anim: 'bat_fly',       die: 'bat_die',      gold: [2, 5] },
+  archer:   { hp: 9,  atk: 3, xp: 9,  speed: 40, poise: 2,  anim: 'archer_idle',   die: 'archer_die',   gold: [4, 9] },
+  brute:    { hp: 26, atk: 5, xp: 18, speed: 26, poise: 6,  anim: 'brute_walk',    die: 'brute_die',    gold: [8, 16] },
+  boss:     { hp: 90, atk: 6, xp: 120, speed: 30, poise: 12, anim: 'boss_idle',    die: 'boss_die',     gold: [50, 80] },
 };
+
+// Melee attack profile: a readable wind-up, a short strike that actually
+// carries the damage, then a recovery you can punish. Contact alone no
+// longer hurts - everything an enemy does is telegraphed first.
+const ATTACK = {
+  slime:    { reach: 22, wind: 0.42, strike: 0.14, recover: 0.28, cd: 0.55, lunge: 105, range: 9 },
+  skeleton: { reach: 24, wind: 0.52, strike: 0.13, recover: 0.36, cd: 0.70, lunge: 60,  range: 10 },
+  bat:      { reach: 28, wind: 0.28, strike: 0.16, recover: 0.46, cd: 0.85, lunge: 185, range: 8 },
+  archer:   null,   // ranged only
+  brute:    { reach: 30, wind: 0.78, strike: 0.18, recover: 0.52, cd: 1.05, lunge: 80,  range: 13 },
+  boss:     { reach: 42, wind: 0.60, strike: 0.20, recover: 0.42, cd: 0.90, lunge: 140, range: 16 },
+};
+
+export const STAGGER_TIME = 0.75;
+
+export function attackProfile(m) { return ATTACK[m.type] || null; }
+
+// Where a wind-up is going to land, in world space.
+export function monsterAttackBox(m) {
+  const A = ATTACK[m.type];
+  if (!A) return null;
+  const c = monsterCenter(m);
+  const r = A.range;
+  const d = m.size * 0.35 + r * 0.7;
+  return {
+    x: c.x + Math.cos(m.atkAng) * d - r,
+    y: c.y + Math.sin(m.atkAng) * d - r,
+    w: r * 2, h: r * 2,
+  };
+}
 
 export function spawnMonster(type, tx, ty) {
   const s = MONSTER_STATS[type];
   const size = type === 'boss' ? 32 : 16;
   return {
     type, ...structuredClone(s),
-    maxHp: s.hp,
+    maxHp: s.hp, poiseMax: s.poise,
     x: tx * TILE, y: ty * TILE, size,
     homeX: tx * TILE, homeY: ty * TILE,
     state: 'idle', t: Math.random() * 2, flip: false,
     hurtT: 0, kbx: 0, kby: 0, telegraphT: 0,
+    atkPhase: 'none', atkT: 0, atkCd: Math.random() * 0.8, atkAng: 0, atkHit: false,
+    staggerT: 0,
     vx: 0, vy: 0,
   };
 }
@@ -147,6 +224,57 @@ export function updateMonster(m, dt) {
     m.kbx *= Math.pow(0.002, dt);
     m.kby *= Math.pow(0.002, dt);
     if (Math.abs(m.kbx) < 4 && Math.abs(m.kby) < 4) { m.kbx = m.kby = 0; }
+  }
+
+  // --- stagger: poise broken, wide open for a moment ------------------
+  if (m.staggerT > 0) {
+    m.staggerT -= dt;
+    m.atkPhase = 'none';
+    m.atkT = 0;
+    m.atkCd = Math.max(m.atkCd, 0.3);
+    return;
+  }
+  if (m.poise < m.poiseMax) {
+    m.poise = Math.min(m.poiseMax, m.poise + dt * m.poiseMax * 0.4);
+  }
+
+  // --- telegraphed melee ----------------------------------------------
+  const A = ATTACK[m.type];
+  if (m.atkPhase !== 'none') {
+    m.atkT -= dt;
+    if (m.atkPhase === 'wind') {
+      // track the player early in the wind-up, then commit, so the
+      // marker on the ground is a promise you can roll out of
+      if (m.atkT > A.wind * 0.4) m.atkAng = Math.atan2(dy, dx);
+      m.flip = Math.cos(m.atkAng) < 0;
+      if (m.atkT <= 0) {
+        m.atkPhase = 'strike';
+        m.atkT = A.strike;
+        m.atkHit = false;
+        sfx('swing');
+      }
+    } else if (m.atkPhase === 'strike') {
+      moveEntity(m, Math.cos(m.atkAng) * A.lunge * dt, Math.sin(m.atkAng) * A.lunge * dt);
+      if (!m.atkHit && overlaps(monsterAttackBox(m), feetBox(p))) {
+        m.atkHit = true;
+        damagePlayer(m.atk, mc.x, mc.y);
+      }
+      if (m.atkT <= 0) { m.atkPhase = 'recover'; m.atkT = A.recover; }
+    } else if (m.atkT <= 0) {
+      m.atkPhase = 'none';
+      m.atkCd = A.cd;
+    }
+    return;
+  }
+  if (A) {
+    m.atkCd -= dt;
+    if (m.atkCd <= 0 && dist < A.reach && m.telegraphT <= 0 && !(m.lungeT > 0)) {
+      m.atkPhase = 'wind';
+      m.atkT = A.wind;
+      m.atkAng = Math.atan2(dy, dx);
+      sfx('telegraph');
+      return;
+    }
   }
 
   switch (m.type) {
@@ -240,12 +368,21 @@ export function updateMonster(m, dt) {
       break;
     }
   }
+}
 
-  // touch damage
-  const box = { x: m.x + 2, y: m.y + m.size * 0.4, w: m.size - 4, h: m.size * 0.55 };
-  if (overlaps(box, feetBox(p))) {
-    damagePlayer(m.atk, mc.x, mc.y);
+// Poise damage from a hit; zero poise means a stagger.
+export function breakPoise(m, amount) {
+  if (m.staggerT > 0) return false;
+  m.poise -= amount;
+  if (m.poise > 0) return false;
+  m.poise = m.poiseMax;
+  m.staggerT = STAGGER_TIME * (m.type === 'boss' ? 0.7 : 1);
+  m.atkPhase = 'none';
+  sfx('break');
+  for (let i = 0; i < 8; i++) {
+    spawnPix(m.x + m.size / 2, m.y + m.size / 2, '#fee761', 4, 60, 0.4);
   }
+  return true;
 }
 
 // --- NPCs --------------------------------------------------------------

@@ -8,6 +8,7 @@ const KEYMAP = {
   ArrowLeft: 'left', KeyA: 'left',
   ArrowRight: 'right', KeyD: 'right',
   Space: 'attack', KeyJ: 'attack',
+  ShiftLeft: 'dodge', ShiftRight: 'dodge', KeyK: 'dodge',
   KeyE: 'interact', Enter: 'interact',
   KeyI: 'inv', Tab: 'inv',
   KeyQ: 'quest',

@@ -5,6 +5,7 @@ import { drawAnim, anim, frameOf, sheetImage } from './assets.js';
 import { input } from './input.js';
 import { sfx } from './audio.js';
 import { xpNeed } from './combat.js';
+import { DODGE } from './entities.js';
 
 export function drawText(ctx, text, x, y, color = '#ffffff') {
   ctx.font = '7px monospace';
@@ -150,6 +151,14 @@ export function drawSquishButton(ctx, x, y, w, h, label, state = {}) {
   }
   ctx.restore();
 
+  if (state.cooldown > 0) {                            // unavailable: drain down
+    ctx.save();
+    roundRect(ctx, 0, 0, w, h, r); ctx.clip();
+    ctx.fillStyle = 'rgba(8,7,18,0.62)';
+    ctx.fillRect(0, 0, w, h * Math.min(1, state.cooldown));
+    ctx.restore();
+  }
+
   ctx.lineWidth = 1;                                   // rim
   ctx.strokeStyle = lit ? '#feae34' : '#12142a';
   roundRect(ctx, 0.5, 0.5, w - 1, h - 1, r); ctx.stroke();
@@ -285,6 +294,19 @@ export function drawHud(ctx) {
     drawSquishButton(ctx, b.x, b.y, b.w, b.h, b.label,
                      { hover, press: pressAmount('hud_' + b.id) });
     G.ui.hudButtons.push(b);
+  }
+
+  // Roll button, so a dodge is reachable with a mouse or a thumb as well
+  // as with Shift.  Drains as it cools down.
+  if (G.mode === 'play') {
+    const rw = touch ? 34 : 28, rh = touch ? 20 : 16;
+    const rb = { id: 'dodge', label: 'ROLL', x: VW - rw - 4, y: VH - rh - 4, w: rw, h: rh };
+    const cd = p.dodgeCd > 0 ? Math.min(1, p.dodgeCd / (DODGE.time + DODGE.cd)) : 0;
+    drawSquishButton(ctx, rb.x, rb.y, rb.w, rb.h, rb.label, {
+      hover: inButton(rb), press: pressAmount('hud_dodge'),
+      cooldown: cd, tone: cd ? null : 'accent',
+    });
+    G.ui.hudButtons.push(rb);
   }
 
   if (G.banner) {
@@ -510,6 +532,7 @@ export function drawTitle(ctx) {
   ctx.fillText('a tiny action rpg', VW / 2, L.subY);
 
   ctx.textAlign = 'left';
+  G.ui.titleButtons = L.btns;
   L.btns.forEach((b, i) => {
     drawSquishButton(ctx, b.x, b.y, b.w, b.h, b.label, {
       selected: st.sel === i,
@@ -574,6 +597,7 @@ export function drawPause(ctx) {
   const L = pauseLayout(opts);
   drawPanel(ctx, L.px, L.py, L.pw, L.ph);
   drawBigText(ctx, 'PAUSED', VW / 2, L.py + 18, '#feae34');
+  G.ui.pauseButtons = L.btns;
   L.btns.forEach((b, i) => {
     drawSquishButton(ctx, b.x, b.y, b.w, b.h, b.label, {
       selected: st.sel === i,
