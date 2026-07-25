@@ -20,12 +20,38 @@ export function say(name, pages, extra = {}) {
   G.mode = 'dialogue';
 }
 
-function choiceRow(i) {
-  // hit zones matching where drawDialogue puts the two choice lines
+// Wrap the whole page up front so the panel is sized once, then reveal
+// characters into that fixed layout - otherwise the box grows as it types.
+function wrapLines(ctx, text, maxW) {
+  ctx.font = '7px monospace';
+  const out = [];
+  for (const para of text.split('\n')) {
+    let cur = '';
+    for (const word of para.split(' ')) {
+      const test = cur ? cur + ' ' + word : word;
+      if (ctx.measureText(test).width > maxW && cur) { out.push(cur); cur = word; }
+      else cur = test;
+    }
+    out.push(cur);
+  }
+  return out;
+}
+
+function dialogueLayout(ctx) {
   const w = Math.min(272, VW - 12);
-  const x = Math.round((VW - w) / 2), y = VH - 60;
-  return input.mouse.x > x + w - 130 && input.mouse.x < x + w - 8 &&
-         input.mouse.y > y + 18 + i * 12 && input.mouse.y < y + 30 + i * 12;
+  const lines = wrapLines(ctx, script.pages[page], w - 24);
+  const showChoices = choosing && script.choice;
+  const textH = lines.length * 10;
+  const h = Math.max(40, 12 + textH + (showChoices ? 30 : 6));
+  const x = Math.round((VW - w) / 2), y = VH - h - 8;
+  return { x, y, w, h, lines, showChoices, choiceY: y + 12 + textH + 10 };
+}
+
+function choiceRow(i) {
+  const L = dialogueLayout(G.ctx);
+  const cy = L.choiceY + i * 12;
+  return input.mouse.x > L.x + 8 && input.mouse.x < L.x + L.w - 8 &&
+         input.mouse.y > cy - 9 && input.mouse.y < cy + 3;
 }
 
 export function updateDialogue(dt) {
@@ -73,8 +99,7 @@ export function updateDialogue(dt) {
 
 export function drawDialogue(ctx) {
   if (!script) return;
-  const w = Math.min(272, VW - 12), h = 52;
-  const x = Math.round((VW - w) / 2), y = VH - h - 8;
+  const { x, y, w, h, lines, showChoices, choiceY } = dialogueLayout(ctx);
   drawPanel(ctx, x, y, w, h);
   if (script.name) {
     ctx.font = '15px "Jacquard 12"';
@@ -82,27 +107,29 @@ export function drawDialogue(ctx) {
     drawPanel(ctx, x + 6, y - 11, nw, 18);
     drawHeading(ctx, script.name, x + 15, y + 2);
   }
-  const text = script.pages[page].slice(0, Math.floor(chars));
-  ctx.font = '7px monospace';
+  // reveal the typed prefix across the pre-wrapped lines
+  let left = Math.floor(chars);
   let yy = y + 14;
-  for (const line of text.split('\n')) {
-    let cur = '';
-    for (const word of line.split(' ')) {
-      const test = cur ? cur + ' ' + word : word;
-      if (ctx.measureText(test).width > w - 24 && cur) {
-        drawText(ctx, cur, x + 12, yy, '#ffffff'); yy += 10; cur = word;
-      } else cur = test;
-    }
-    drawText(ctx, cur, x + 12, yy, '#ffffff'); yy += 10;
+  for (const line of lines) {
+    if (left <= 0) break;
+    drawText(ctx, line.slice(0, left), x + 12, yy, '#ffffff');
+    left -= line.length + 1;
+    yy += 10;
   }
   const full = chars >= script.pages[page].length;
-  if (full && choosing) {
+  if (full && showChoices) {
     const c = script.choice;
-    const cxp = x + w - 126;
-    drawText(ctx, (choiceSel === 0 ? '> ' : '  ') + c.yes, cxp, y + 26, choiceSel === 0 ? '#fee761' : '#c0cbdc');
-    drawText(ctx, (choiceSel === 1 ? '> ' : '  ') + c.no, cxp, y + 38, choiceSel === 1 ? '#fee761' : '#c0cbdc');
+    for (const [i, label] of [c.yes, c.no].entries()) {
+      const on = choiceSel === i;
+      if (on) {
+        ctx.fillStyle = '#3a4466';
+        ctx.fillRect(x + 8, choiceY + i * 12 - 9, w - 16, 12);
+      }
+      drawText(ctx, (on ? '> ' : '  ') + label, x + 12, choiceY + i * 12,
+               on ? '#fee761' : '#c0cbdc');
+    }
   } else if (full && Math.floor(G.time * 2.5) % 2) {
-    drawText(ctx, 'v', x + w - 14, y + h - 8, '#feae34');
+    drawText(ctx, 'v', x + w - 14, y + h - 6, '#feae34');
   }
 }
 

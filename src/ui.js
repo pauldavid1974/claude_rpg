@@ -64,67 +64,80 @@ export function drawPanel(ctx, x, y, w, h) {
 
 export function drawHud(ctx) {
   const p = G.player;
+
+  // Buttons first: they own the top-right corner, and everything else
+  // lays out around whatever room they leave.
+  const touch = document.body.classList.contains('touch');
+  const narrow = VW < 250;
+  const bh = touch ? 20 : 13;
+  const pad = touch ? (narrow ? 5 : 8) : 4;
+  const labels = narrow
+    ? [['inv', 'BAG'], ['quest', 'QST'], ['pause', 'MENU']]
+    : [['inv', 'BAG'], ['quest', 'QUESTS'], ['pause', 'MENU']];
+  G.ui.hudButtons = [];
+  let bx = VW - 4;
+  for (let i = labels.length - 1; i >= 0; i--) {
+    const [id, label] = labels[i];
+    const w = label.length * 5 + pad * 2;
+    bx -= w + 4;
+    const hover = input.mouse.x >= bx && input.mouse.x < bx + w &&
+                  input.mouse.y >= 3 && input.mouse.y < 3 + bh;
+    ctx.fillStyle = hover ? '#3a4466' : 'rgba(38,43,68,0.8)';
+    ctx.fillRect(bx, 3, w, bh);
+    ctx.strokeStyle = '#181425'; ctx.lineWidth = 1;
+    ctx.strokeRect(bx + 0.5, 3.5, w - 1, bh - 1);
+    drawText(ctx, label, bx + pad, 3 + bh / 2 + 3, hover ? '#fee761' : '#8b9bb4');
+    G.ui.hudButtons.push({ id, x: bx, y: 3, w, h: bh });
+  }
+
+  // Stats plate: beside the buttons when it fits, tucked under them when
+  // it doesn't, with hearts wrapping onto extra rows as max HP grows.
   const hearts = Math.ceil(p.maxHp / 2);
-  // backing plate keeps the readouts legible over bright terrain
-  const plateW = Math.max(74, 8 + hearts * 11);
+  const beside = bx - 6;
+  const under = beside < 70;
+  const plateY = under ? 3 + bh + 3 : 0;
+  const availW = under ? VW - 8 : beside;
+  const perRow = Math.max(1, Math.floor((availW - 6) / 11));
+  const heartRows = Math.ceil(hearts / perRow);
+  const plateW = Math.min(availW, Math.max(74, 8 + Math.min(hearts, perRow) * 11));
+  const plateH = 40 + (heartRows - 1) * 11;
   ctx.fillStyle = 'rgba(12,10,26,0.45)';
-  ctx.fillRect(0, 0, plateW, 40);
+  ctx.fillRect(0, plateY, plateW, plateH);
   ctx.fillStyle = 'rgba(12,10,26,0.25)';
-  ctx.fillRect(plateW, 0, 4, 40);
-  ctx.fillRect(0, 40, plateW + 4, 3);
+  ctx.fillRect(plateW, plateY, 4, plateH);
+  ctx.fillRect(0, plateY + plateH, plateW + 4, 3);
+
   const wob = p.hurtWobble > 0 ? p.hurtWobble : 0;
   if (p.hurtWobble > 0) p.hurtWobble -= 1 / 60;
   for (let i = 0; i < hearts; i++) {
     const hp2 = p.hp - i * 2;
     const name = hp2 >= 2 ? 'heart_full' : hp2 === 1 ? 'heart_half' : 'heart_empty';
     const jitter = wob > 0 ? Math.round(Math.sin(G.time * 40 + i) * wob * 3) : 0;
-    drawAnim(ctx, name, 0, 4 + i * 11, 2 + jitter);
+    drawAnim(ctx, name, 0, 4 + (i % perRow) * 11,
+             plateY + 2 + Math.floor(i / perRow) * 11 + jitter);
   }
-  // gold
-  drawAnim(ctx, 'coin', frameOf('coin', G.time), 2, 14);
-  drawText(ctx, '' + p.gold, 18, 25, '#fee761');
-  // level + xp bar
-  drawText(ctx, 'LV' + p.level, 4, 37, '#c0cbdc');
+  const statY = plateY + 14 + (heartRows - 1) * 11;
+  drawAnim(ctx, 'coin', frameOf('coin', G.time), 2, statY);
+  drawText(ctx, '' + p.gold, 18, statY + 11, '#fee761');
+  drawText(ctx, 'LV' + p.level, 4, statY + 23, '#c0cbdc');
   ctx.fillStyle = '#262b44';
-  ctx.fillRect(26, 32, 40, 4);
+  ctx.fillRect(26, statY + 18, Math.min(40, plateW - 30), 4);
   ctx.fillStyle = '#63c74d';
-  ctx.fillRect(26, 32, Math.round(40 * Math.min(1, p.xp / xpNeed(p.level))), 4);
+  ctx.fillRect(26, statY + 18,
+    Math.round(Math.min(40, plateW - 30) * Math.min(1, p.xp / xpNeed(p.level))), 4);
 
   if (G.banner) {
     G.banner.t -= 1 / 60;
     if (G.banner.t <= 0) G.banner = null;
     else {
-      const a = Math.min(1, G.banner.t * 2);
-      ctx.globalAlpha = a;
+      ctx.globalAlpha = Math.min(1, G.banner.t * 2);
       const w = Math.min(G.banner.text.length * 5 + 20, VW - 8);
-      drawPanel(ctx, (VW - w) / 2, 6, w, 18);
-      drawTextC(ctx, G.banner.text, VW / 2, 18, '#fee761');
+      drawPanel(ctx, (VW - w) / 2, plateY + (under ? 26 : 6) + bh, w, 18);
+      drawTextC(ctx, G.banner.text, VW / 2, plateY + (under ? 38 : 18) + bh, '#fee761');
       ctx.globalAlpha = 1;
     }
   }
-  // clickable / tappable HUD buttons
-  {
-    const touch = document.body.classList.contains('touch');
-    const h = touch ? 20 : 13;
-    const pad = touch ? 8 : 4;
-    const labels = [['inv', 'BAG'], ['quest', 'QUESTS'], ['pause', 'MENU']];
-    G.ui.hudButtons = [];
-    let bx = VW - 4;
-    for (let i = labels.length - 1; i >= 0; i--) {
-      const [id, label] = labels[i];
-      const w = label.length * 5 + pad * 2;
-      bx -= w + 4;
-      const hover = input.mouse.x >= bx && input.mouse.x < bx + w &&
-                    input.mouse.y >= 3 && input.mouse.y < 3 + h;
-      ctx.fillStyle = hover ? '#3a4466' : 'rgba(38,43,68,0.8)';
-      ctx.fillRect(bx, 3, w, h);
-      ctx.strokeStyle = '#181425'; ctx.lineWidth = 1;
-      ctx.strokeRect(bx + 0.5, 3.5, w - 1, h - 1);
-      drawText(ctx, label, bx + pad, 3 + h / 2 + 3, hover ? '#fee761' : '#8b9bb4');
-      G.ui.hudButtons.push({ id, x: bx, y: 3, w, h });
-    }
-  }
-  if (G.muted) drawText(ctx, 'MUTED (M)', VW - 58, 26, '#5a6988');
+  if (G.muted) drawText(ctx, 'MUTED', 4, VH - 4, '#5a6988');
 }
 
 // --- screens -----------------------------------------------------------

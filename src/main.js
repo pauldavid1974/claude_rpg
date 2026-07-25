@@ -38,8 +38,8 @@ G.ctx.imageSmoothingEnabled = false;
 // Zoom is chosen so the visible slice of world stays in a sane band no
 // matter the screen shape: never wider/taller than MAX (which is what
 // made phones feel like watching from orbit), never tighter than MIN.
-const MAX_VIEW_W = 384, MAX_VIEW_H = 288;
-const MIN_VIEW_W = 200, MIN_VIEW_H = 140;
+const MAX_VIEW_W = 340, MAX_VIEW_H = 240;
+const MIN_VIEW_W = 150, MIN_VIEW_H = 110;
 
 function resize() {
   const dpr = window.devicePixelRatio || 1;
