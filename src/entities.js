@@ -27,6 +27,11 @@ function propBlocked(b) {
   return false;
 }
 
+// Would the collision box be blocked with its centre at (cx, cy)?
+export function feetBlockedAt(cx, cy) {
+  return boxBlocked(G.map, { x: cx - 5, y: cy - 3, w: 10, h: 6 });
+}
+
 export function moveEntity(e, dx, dy) {
   const map = G.map;
   if (dx) {
