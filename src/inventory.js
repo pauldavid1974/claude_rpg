@@ -5,7 +5,7 @@ import { ITEMS } from './items.js';
 import { input } from './input.js';
 import { sfx } from './audio.js';
 import { addFloat } from './particles.js';
-import { drawPanel, drawText, drawTextC } from './ui.js';
+import { drawPanel, drawText, drawTextC, drawHeading } from './ui.js';
 import { drawAnim } from './assets.js';
 
 export const COLS = 6, ROWS = 4;
@@ -138,7 +138,7 @@ export function drawInventory(ctx) {
   ctx.translate(0, slide);
   ctx.globalAlpha = st.t;
   drawPanel(ctx, mx, my, w, h);
-  drawText(ctx, 'INVENTORY', mx + 10, my + 12, '#feae34');
+  drawHeading(ctx, 'Inventory', mx + 10, my + 14);
   drawText(ctx, 'gold ' + G.player.gold, mx + 100, my + 12, '#fee761');
   const p = G.player;
   for (let i = 0; i < cells.length; i++) {

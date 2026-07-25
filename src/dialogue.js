@@ -4,7 +4,7 @@
 import { G, VW, VH } from './state.js';
 import { input } from './input.js';
 import { sfx } from './audio.js';
-import { drawPanel, drawText } from './ui.js';
+import { drawPanel, drawText, drawHeading } from './ui.js';
 import {
   isActive, isDone, canTurnIn, startQuest, turnIn, questProgress, QUESTS,
 } from './quests.js';
@@ -76,8 +76,10 @@ export function drawDialogue(ctx) {
   const x = Math.round((VW - w) / 2), y = VH - 60;
   drawPanel(ctx, x, y, w, h);
   if (script.name) {
-    drawPanel(ctx, x + 6, y - 10, Math.max(40, script.name.length * 5 + 14), 16);
-    drawText(ctx, script.name, x + 13, y + 1, '#feae34');
+    ctx.font = '15px "Jacquard 12"';
+    const nw = Math.max(44, Math.ceil(ctx.measureText(script.name).width) + 18);
+    drawPanel(ctx, x + 6, y - 11, nw, 18);
+    drawHeading(ctx, script.name, x + 15, y + 2);
   }
   const text = script.pages[page].slice(0, Math.floor(chars));
   ctx.font = '7px monospace';

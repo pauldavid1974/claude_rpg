@@ -6,7 +6,15 @@
 import { TILE } from './state.js';
 
 const GRASS = new Set(['.', ',', ':', ';', 't', 'r', 'f']);
-const SOLID = new Set(['t', 'r', 'f', 'w', 'W', 'U', 'V', 'R', 'b']);
+const SOLID = new Set(['t', 'r', 'f', 'w', 'W', 'U', 'V', 'R', 'b',
+                       '[', ']', '{', '}', '=', '_', 'O']);
+
+// Stable per-tile hash, for picking sprite variants and decals.
+function hash2(x, y, salt = 0) {
+  let h = (x * 374761393 + y * 668265263 + salt * 2147483647) >>> 0;
+  h = (h ^ (h >>> 13)) * 1274126177 >>> 0;
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
 
 // deterministic rng so maps are stable across visits
 function rng(seed) {
@@ -47,15 +55,48 @@ function scatter(m, ch, region, density, seed) {
     if (m[j] && GRASS.has(m[j][i]) && m[j][i] !== 't' && r() < density) m[j][i] = ch;
   }
 }
+// Facade: gabled roof with slope caps, an overhanging eave, a window row
+// and a wall row with the door.
 function building(m, x, y, w, roof) {
-  rect(m, x, y, w, 2, roof);           // roof
-  rect(m, x, y + 2, w, 2, 'W');        // walls
-  m[y + 3][x + Math.floor(w / 2)] = 'D';
+  const blue = roof === 'b';
+  rect(m, x, y, w, 1, roof);
+  m[y][x] = blue ? '{' : '[';
+  m[y][x + w - 1] = blue ? '}' : ']';
+  rect(m, x, y + 1, w, 1, blue ? '_' : '=');
+  rect(m, x, y + 2, w, 2, 'W');
+  const door = x + Math.floor(w / 2);
+  m[y + 2][door - 2] = 'O';                                   // windows flank
+  m[y + 2][door + 2] = 'O';                                   // the doorway
+  m[y + 3][door] = 'D';
 }
+// Soften the hard rectangle of border trees into a ragged treeline.
+function fringe(m, seed) {
+  const h = m.length, w = m[0].length;
+  scatter(m, 't', [1, 2, w - 2, 2], 0.4, seed);
+  scatter(m, 't', [1, h - 4, w - 2, 2], 0.4, seed + 1);
+  scatter(m, 't', [2, 1, 2, h - 2], 0.4, seed + 2);
+  scatter(m, 't', [w - 4, 1, 2, h - 2], 0.4, seed + 3);
+}
+
 function pond(m, cx, cy, rx, ry) {
   for (let j = cy - ry; j <= cy + ry; j++) for (let i = cx - rx; i <= cx + rx; i++) {
     const dx = (i - cx) / rx, dy = (j - cy) / ry;
     if (dx * dx + dy * dy <= 1 && m[j] && m[j][i] !== undefined) m[j][i] = 'w';
+  }
+  // Drop single-tile spurs so the bank reads as a smooth curve.
+  for (let pass = 0; pass < 2; pass++) {
+    const doomed = [];
+    for (let j = cy - ry - 1; j <= cy + ry + 1; j++) {
+      for (let i = cx - rx - 1; i <= cx + rx + 1; i++) {
+        if (!m[j] || m[j][i] !== 'w') continue;
+        let n = 0;
+        for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          if (m[j + oy] && m[j + oy][i + ox] === 'w') n++;
+        }
+        if (n < 2) doomed.push([i, j]);
+      }
+    }
+    for (const [i, j] of doomed) m[j][i] = '.';
   }
 }
 
@@ -78,6 +119,8 @@ function overworld() {
   // clearings so quest spots stay reachable
   rect(m, 30, 24, 5, 4, '.'); rect(m, 26, 6, 4, 3, '.');
   rect(m, 36, 8, 4, 3, '.'); rect(m, 33, 19, 3, 3, '.');
+  fringe(m, 41);
+  scatter(m, 't', [24, 18, 18, 12], 0.10, 88);   // thicken the deep forest
   scatterGrass(m, 5);
   return {
     music: 'overworld',
@@ -122,6 +165,7 @@ function town1() {
   hline(m, 8, 3, 25, 'p');
   hline(m, 8, 24, 25, 'p');
   rect(m, 11, 11, 4, 3, 'f'); rect(m, 12, 12, 2, 1, '.');  // small pen
+  fringe(m, 61);
   scatterGrass(m, 9);
   return {
     music: 'town',
@@ -157,6 +201,7 @@ function town2() {
   hline(m, 8, 0, 22, 'p');
   hline(m, 8, 0, 1, 'p');
   rect(m, 11, 12, 3, 2, 'w');   // little well pond
+  fringe(m, 71);
   scatterGrass(m, 11);
   return {
     music: 'town',
@@ -305,10 +350,43 @@ const BUILDERS = {
 const TILE_SPRITES = {
   '.': 'grass_1', ',': 'grass_2', ':': 'grass_3', ';': 'grass_flowers',
   'F': 'floor_wood', 'S': 'floor_stone', 'D': 'door',
-  'W': 'wall_stone', 'U': 'wall_dungeon', 'V': 'wall_wood',
+  'W': 'wall_stone', 'U': 'wall_dungeon', 'V': 'wall_wood', 'O': 'wall_window',
   'R': 'roof_red', 'b': 'roof_blue',
+  '[': 'roof_red_l', ']': 'roof_red_r', '=': 'roof_eave',
+  '{': 'roof_blue_l', '}': 'roof_blue_r', '_': 'roof_eave_blue',
 };
-const OVERLAYS = { 't': 'tree', 'r': 'stone', 'f': 'fence' };
+const OVERLAYS = { 'r': 'stone', 'f': 'fence' };
+const TREES = ['tree', 'tree', 'tree', 'tree_pine', 'tree_pine', 'tree_small', 'bush'];
+
+// Scatter decals over open ground so large areas stop reading as tiled.
+// Weighted: quiet ground cover is common, landmarks like logs are rare.
+const GRASS_DECALS = [
+  ['dec_tuft', 34], ['dec_pebbles', 16], ['dec_flowers_white', 16],
+  ['dec_flowers_red', 8], ['dec_mushrooms', 6], ['dec_log', 3],
+];
+const STONE_DECALS = [['dec_cracks', 60], ['dec_rubble', 40]];
+
+function pickWeighted(table, r) {
+  const total = table.reduce((a, e) => a + e[1], 0);
+  let v = r * total;
+  for (const [name, w] of table) {
+    v -= w;
+    if (v <= 0) return name;
+  }
+  return table[0][0];
+}
+
+function decalFor(ch, x, y) {
+  const r = hash2(x, y, 7);
+  if (GRASS.has(ch) && ch !== 't' && ch !== 'r' && ch !== 'f') {
+    if (r < 0.20) return pickWeighted(GRASS_DECALS, hash2(x, y, 11));
+  } else if (ch === 'S') {
+    if (r < 0.12) return pickWeighted(STONE_DECALS, hash2(x, y, 11));
+  } else if (ch === 'p') {
+    if (r < 0.06) return 'dec_pebbles';
+  }
+  return null;
+}
 
 function isGrassFamily(ch) { return GRASS.has(ch) || ch === undefined; }
 
@@ -341,16 +419,20 @@ export function buildMap(name) {
           isGrassFamily(at(x, y - 1)), isGrassFamily(at(x, y + 1)),
           isGrassFamily(at(x + 1, y)), isGrassFamily(at(x - 1, y)));
       } else if (ch === 'w') {
-        base = edgeName('shore', 'water',
+        const openWater = ['water', 'water_b', 'water_c'][Math.floor(hash2(x, y, 13) * 3)];
+        base = edgeName('shore', openWater,
           isGrassFamily(at(x, y - 1)), isGrassFamily(at(x, y + 1)),
           isGrassFamily(at(x + 1, y)), isGrassFamily(at(x - 1, y)));
+      } else if (ch === 't') {
+        base = ['grass_1', 'grass_2', 'grass_3'][Math.floor(hash2(x, y, 3) * 3)];
+        overlay = TREES[Math.floor(hash2(x, y, 5) * TREES.length)];
       } else if (OVERLAYS[ch]) {
         base = 'grass_1';
         overlay = OVERLAYS[ch];
       } else {
         base = TILE_SPRITES[ch];
       }
-      render[y].push({ base, overlay });
+      render[y].push({ base, overlay, decal: decalFor(ch, x, y) });
       solid[y].push(SOLID.has(ch));
     }
   }

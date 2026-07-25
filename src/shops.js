@@ -5,7 +5,7 @@ import { input } from './input.js';
 import { sfx } from './audio.js';
 import { ITEMS, sellPrice } from './items.js';
 import { addItem, removeItem } from './inventory.js';
-import { drawPanel, drawText, drawTextC } from './ui.js';
+import { drawPanel, drawText, drawTextC, drawHeading } from './ui.js';
 import { drawAnim } from './assets.js';
 
 export const SHOPS = {
@@ -120,7 +120,7 @@ export function drawShop(ctx) {
   ctx.translate(0, Math.round((1 - st.t) * -30));
   ctx.globalAlpha = st.t;
   drawPanel(ctx, x, y, w, h);
-  drawText(ctx, shop.name.toUpperCase(), x + 10, y + 13, '#feae34');
+  drawHeading(ctx, shop.name, x + 10, y + 15);
   const goldCol = st.flash > 0 && Math.floor(st.flash * 10) % 2 ? '#e43b44' : '#fee761';
   drawAnim(ctx, 'coin', 0, x + w - 58, y + 4);
   drawText(ctx, '' + G.player.gold, x + w - 40, y + 13, goldCol);

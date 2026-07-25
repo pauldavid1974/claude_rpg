@@ -3,7 +3,7 @@
 import { G, VW, VH } from './state.js';
 import { input } from './input.js';
 import { sfx } from './audio.js';
-import { drawPanel, drawText, drawTextC } from './ui.js';
+import { drawPanel, drawText, drawTextC, drawHeading } from './ui.js';
 
 export const QUESTS = {
   q_slimes: {
@@ -124,7 +124,7 @@ export function drawQuests(ctx) {
   const w = 220, h = 156;
   const x = Math.round((VW - w) / 2), y = Math.round((VH - h - 12) / 2);
   drawPanel(ctx, x, y, w, h);
-  drawText(ctx, 'QUEST LOG', x + 10, y + 13, '#feae34');
+  drawHeading(ctx, 'Quest Log', x + 10, y + 15);
   let yy = y + 28;
   const entries = Object.entries(QUESTS).filter(([id]) => G.quests[id]);
   if (!entries.length) drawText(ctx, 'No quests yet. Talk to the villagers.', x + 10, yy, '#8b9bb4');

@@ -21,6 +21,16 @@ export function drawTextC(ctx, text, cx, y, color = '#ffffff') {
   ctx.textAlign = 'left';
 }
 
+// Panel heading in the display face.
+export function drawHeading(ctx, text, x, y, color = '#fee761') {
+  ctx.font = '15px "Jacquard 12"';
+  ctx.fillStyle = '#181425';
+  ctx.fillText(text, Math.round(x) + 1, Math.round(y) + 1);
+  ctx.fillStyle = color;
+  ctx.fillText(text, Math.round(x), Math.round(y));
+  ctx.font = '7px monospace';
+}
+
 export function drawBigText(ctx, text, cx, y, color = '#ffffff') {
   ctx.font = 'bold 14px monospace';
   ctx.textAlign = 'center';
@@ -54,8 +64,14 @@ export function drawPanel(ctx, x, y, w, h) {
 
 export function drawHud(ctx) {
   const p = G.player;
-  // hearts (each heart = 2 hp)
   const hearts = Math.ceil(p.maxHp / 2);
+  // backing plate keeps the readouts legible over bright terrain
+  const plateW = Math.max(74, 8 + hearts * 11);
+  ctx.fillStyle = 'rgba(12,10,26,0.45)';
+  ctx.fillRect(0, 0, plateW, 40);
+  ctx.fillStyle = 'rgba(12,10,26,0.25)';
+  ctx.fillRect(plateW, 0, 4, 40);
+  ctx.fillRect(0, 40, plateW + 4, 3);
   const wob = p.hurtWobble > 0 ? p.hurtWobble : 0;
   if (p.hurtWobble > 0) p.hurtWobble -= 1 / 60;
   for (let i = 0; i < hearts; i++) {

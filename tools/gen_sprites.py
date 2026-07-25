@@ -796,14 +796,29 @@ def tile_fill(ch):
 
 
 def grass_tile(seed, flowers=False):
+    """Grass with clumped value variation.
+
+    All the noise comes from waves whose period divides 16, so the tile is
+    seamless against copies of itself in every direction.
+    """
     rnd = random.Random(seed)
     t = tile_fill("G")
-    for _ in range(9):  # light blade tufts, 2px tall
-        x, y = rnd.randrange(16), rnd.randrange(1, 16)
+    ph = seed * 1.7
+    for y in range(16):
+        for x in range(16):
+            v = (math.sin((x + ph) * math.pi / 8) * math.cos((y + ph * 2) * math.pi / 8)
+                 + 0.55 * math.sin((2 * x + 3 * y + ph) * math.pi / 8)
+                 + 0.35 * math.cos((3 * x - 2 * y + ph * 3) * math.pi / 8))
+            if v > 1.05:
+                t[y][x] = "g"      # sunlit clump
+            elif v < -1.05:
+                t[y][x] = "H"      # shaded clump
+    for _ in range(7):             # blade tufts catching the light
+        x, y = rnd.randrange(16), rnd.randrange(2, 16)
         t[y][x] = "g"
         t[y - 1][x] = "g"
-    for _ in range(6):
-        t[rnd.randrange(16)][rnd.randrange(16)] = "H"
+        if rnd.random() < 0.5:
+            t[y - 1][(x + 1) % 16] = "g"
     if flowers:
         for fx, fy, col in [(4, 4, "Y"), (11, 10, "6")]:
             t[fy][fx] = col
@@ -855,16 +870,43 @@ def path_edge(dirs):
     return t
 
 
-def water_tile(frame):
+# Crest rows differ per variant so neighbouring tiles don't line up.
+WATER_CRESTS = [(3, 11), (7, 14), (1, 9)]
+
+
+def water_tile(frame, variant=0):
+    """Open water: depth mottling, drifting swell, and crest glints.
+
+    Every wave has a period dividing 16 in x and y, so tiles stay seamless;
+    `frame` and `variant` only shift phase.
+    """
     t = tile_fill("B")
-    for row in (2, 6, 10, 14):
+    ph = variant * 5.5
+    for y in range(16):
         for x in range(16):
-            ph = (x + frame * 2 + row) % 8
-            if ph < 3:
-                t[row][x] = "b"
-            if ph == 0 and row in (2, 10):
+            v = (math.sin((x + frame * 1.5 + ph) * math.pi / 8)
+                 + 0.7 * math.cos((2 * y - x + frame + ph) * math.pi / 8)
+                 + 0.5 * math.sin((x + 3 * y + ph * 2) * math.pi / 8))
+            if v > 1.25:
+                t[y][x] = "b"       # swell catching the light
+            elif v < -1.35:
+                t[y][x] = "1"       # depth
+    for row in WATER_CRESTS[variant]:   # crests drifting sideways
+        for x in range(16):
+            if (x + frame * 3 + row * 5 + variant * 6) % 16 < 3:
                 t[row][x] = "c"
+                t[(row + 1) % 16][x] = "b"
     return t
+
+
+def _ring(mask, x, y, dist):
+    """Is any masked cell within `dist` (chebyshev) of x, y?"""
+    for oy in range(-dist, dist + 1):
+        for ox in range(-dist, dist + 1):
+            nx, ny = x + ox, y + oy
+            if 0 <= nx < 16 and 0 <= ny < 16 and mask[ny][nx]:
+                return True
+    return False
 
 
 def shore_tile(dirs, frame):
@@ -875,12 +917,11 @@ def shore_tile(dirs, frame):
         for x in range(16):
             if m[y][x]:
                 t[y][x] = g[y][x]
-            else:
-                for ox, oy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                    nx, ny = x + ox, y + oy
-                    if 0 <= nx < 16 and 0 <= ny < 16 and m[ny][nx]:
-                        t[y][x] = "E"  # sandy lip
-                        break
+            elif _ring(m, x, y, 1):
+                # wet sand with foam that washes along the waterline
+                t[y][x] = "6" if (x * 3 + y * 5 + frame * 4) % 11 < 3 else "E"
+            elif _ring(m, x, y, 2):
+                t[y][x] = "c" if (x + y * 2 + frame * 3) % 9 < 2 else "b"  # shallows
     return t
 
 
@@ -1000,6 +1041,115 @@ def build_terrain():
         "030eeeeeeeeee030",
         "0000000000000000",
     )
+    tree_pine = F(
+        "................",
+        "................",
+        ".......00.......",
+        "......0gG0......",
+        "......0gG0......",
+        ".....0gggG0.....",
+        ".....0gGGG0.....",
+        "....0ggggGG0....",
+        "....0gGGGGG0....",
+        "...0gggggGGG0...",
+        "...0gGGHHGGG0...",
+        "..0ggggGGHHHG0..",
+        "..00GGHHHHH000..",
+        ".....0TtT0......",
+        ".....0TtTe0.....",
+        "................",
+    )
+    tree_small = F(
+        "................",
+        "................",
+        "................",
+        "......0000......",
+        ".....0gggg0.....",
+        "....0ggggGG0....",
+        "....0gGggGG0....",
+        "...0ggggGGGG0...",
+        "...0gGGgGGHG0...",
+        "...0GGGGGHHH0...",
+        "....0GHHHHH0....",
+        ".....00TtT00....",
+        "......0TtTe0....",
+        "......0TtTe0....",
+        ".....0TTtTTe0...",
+        "................",
+    )
+    bush = F(
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "......0000......",
+        "....00gggg00....",
+        "...0gggggggG0...",
+        "..0ggGggggGGG0..",
+        "..0gGGgggGGHG0..",
+        "..0GGGGgGGHHH0..",
+        "...0GGHHHHHH0...",
+        "....00HHHH00....",
+        "......0000......",
+        "................",
+        "................",
+    )
+    # building facade pieces
+    def roof_slope(flip=False):
+        t = roof_tile()
+        for y in range(16):
+            cut = 16 - y  # diagonal gable edge
+            for x in range(16):
+                xx = 15 - x if flip else x
+                if xx >= cut:
+                    t[y][x] = TRANSPARENT
+                elif xx == cut - 1:
+                    t[y][x] = "0"
+        return t
+
+    roof_eave = F(
+        "0000000000000000",
+        "0RRRRRRRRRRRRRR0",
+        "0RrrrrrrrrrrrrR0",
+        "0RRRRRRRRRRRRRR0",
+        "0000000000000000",
+        "0eeeeeeeeeeeeee0",
+        "0TTTTTTTTTTTTTT0",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+    )
+    # stone wall with a warm lit window: timber frame, cross mullion, sill
+    wall_window = brick_wall()
+    for y in range(2, 13):
+        for x in range(3, 13):
+            wall_window[y][x] = "T"
+    for y in range(3, 12):
+        for x in range(4, 12):
+            wall_window[y][x] = "y" if (x + y) % 5 else "Y"
+    for y in range(3, 12):        # vertical mullion
+        wall_window[y][7] = "e"
+        wall_window[y][8] = "T"
+    for x in range(4, 12):        # horizontal mullion
+        wall_window[7][x] = "e"
+        wall_window[8][x] = "T"
+    for x in range(4, 12):        # top-left panes catch more light
+        for y in range(3, 7):
+            if wall_window[y][x] in ("y", "Y") and x < 7:
+                wall_window[y][x] = "Y"
+    for x in range(2, 14):        # sill
+        wall_window[13][x] = "4"
+        wall_window[14][x] = "2"
+    wall_window[13][2] = "0"
+    wall_window[13][13] = "0"
+
     s = Sheet("terrain", 16)
     s.add("grass_1", [grass_tile(1)])
     s.add("grass_2", [grass_tile(2)])
@@ -1008,10 +1158,15 @@ def build_terrain():
     s.add("path", [path_base()])
     for d in ["N", "S", "E", "W", "NW", "NE", "SW", "SE"]:
         s.add("path_edge_" + d.lower(), [path_edge(d)])
-    s.add("water", [water_tile(f) for f in range(4)], 5)
+    for v in range(3):
+        s.add("water" + ("" if v == 0 else "_" + "bc"[v - 1]),
+              [water_tile(f, v) for f in range(4)], 5)
     for d in ["N", "S", "E", "W", "NW", "NE", "SW", "SE"]:
         s.add("shore_" + d.lower(), [shore_tile(d, f) for f in range(4)], 5)
     s.add("tree", [tree])
+    s.add("tree_pine", [tree_pine])
+    s.add("tree_small", [tree_small])
+    s.add("bush", [bush])
     s.add("stone", [stone])
     s.add("wall_stone", [brick_wall()])
     s.add("wall_dungeon", [recolor(brick_wall(), {"3": "2", "4": "3", "2": "1", "1": "0"})])
@@ -1020,7 +1175,107 @@ def build_terrain():
     s.add("floor_stone", [stone_floor()])
     s.add("roof_red", [roof_tile()])
     s.add("roof_blue", [roof_tile("b", "B", "1")])
+    s.add("roof_red_l", [roof_slope()])
+    s.add("roof_red_r", [roof_slope(flip=True)])
+    s.add("roof_blue_l", [recolor(roof_slope(), {"F": "b", "r": "B", "R": "1"})])
+    s.add("roof_blue_r", [recolor(roof_slope(flip=True), {"F": "b", "r": "B", "R": "1"})])
+    s.add("roof_eave", [roof_eave])
+    s.add("roof_eave_blue", [recolor(roof_eave, {"R": "1", "r": "B"})])
+    s.add("wall_window", [wall_window])
     s.add("door", [door])
+    return s
+
+
+# ---------------------------------------------------------------------------
+# DECALS — scattered over grass to break up tiling.
+# ---------------------------------------------------------------------------
+
+def build_decals():
+    def blank_t():
+        return blank(16, 16)
+
+    flowers_white = blank_t()
+    for fx, fy in [(3, 5), (9, 3), (6, 11), (12, 9)]:
+        plot(flowers_white, fx, fy, "6")
+        plot(flowers_white, fx - 1, fy, "5")
+        plot(flowers_white, fx + 1, fy, "5")
+        plot(flowers_white, fx, fy - 1, "5")
+        plot(flowers_white, fx, fy + 1, "Y")
+        plot(flowers_white, fx, fy + 2, "H")
+
+    flowers_red = blank_t()
+    for fx, fy in [(4, 4), (11, 6), (7, 12)]:
+        plot(flowers_red, fx, fy, "r")
+        plot(flowers_red, fx - 1, fy, "R")
+        plot(flowers_red, fx + 1, fy, "F")
+        plot(flowers_red, fx, fy - 1, "F")
+        plot(flowers_red, fx, fy + 1, "R")
+        plot(flowers_red, fx, fy + 2, "H")
+
+    tuft = blank_t()
+    for bx, by, h in [(3, 12, 4), (5, 13, 5), (7, 12, 3), (11, 13, 4), (13, 12, 3)]:
+        for i in range(h):
+            plot(tuft, bx + (1 if i > h - 2 else 0), by - i, "G" if i == 0 else "g")
+        plot(tuft, bx, by + 1, "H")
+
+    pebbles = blank_t()
+    for px, py, w in [(4, 9, 3), (9, 5, 2), (11, 11, 3), (6, 13, 2)]:
+        for i in range(w):
+            plot(pebbles, px + i, py, "4")
+            plot(pebbles, px + i, py + 1, "3")
+        plot(pebbles, px, py, "5")
+        plot(pebbles, px - 1, py + 1, "0")
+        plot(pebbles, px + w, py + 1, "0")
+
+    mushrooms = blank_t()
+    for mx, my in [(5, 8), (10, 11)]:
+        for dx in range(-2, 3):
+            plot(mushrooms, mx + dx, my, "r")
+        plot(mushrooms, mx - 2, my, "R")
+        plot(mushrooms, mx + 2, my, "R")
+        plot(mushrooms, mx - 1, my - 1, "F")
+        plot(mushrooms, mx, my - 1, "r")
+        plot(mushrooms, mx + 1, my - 1, "R")
+        plot(mushrooms, mx, my + 1, "E")
+        plot(mushrooms, mx, my + 2, "N")
+
+    log = blank_t()
+    for x in range(2, 14):
+        plot(log, x, 8, "0")
+        plot(log, x, 9, "t")
+        plot(log, x, 10, "T")
+        plot(log, x, 11, "e")
+        plot(log, x, 12, "0")
+    for y in range(9, 12):
+        plot(log, 2, y, "0")
+    plot(log, 13, 9, "d")
+    plot(log, 13, 10, "T")
+    plot(log, 14, 10, "0")
+    plot(log, 6, 9, "d")
+    plot(log, 10, 10, "e")
+
+    cracks = blank_t()
+    for cx, cy in [(3, 4), (4, 5), (5, 5), (6, 6), (10, 9), (11, 10), (12, 10)]:
+        plot(cracks, cx, cy, "1")
+    for cx, cy in [(4, 4), (5, 6), (11, 9)]:
+        plot(cracks, cx, cy, "0")
+
+    rubble = blank_t()
+    for rx, ry in [(4, 7), (9, 4), (11, 12), (6, 12)]:
+        plot(rubble, rx, ry, "3")
+        plot(rubble, rx + 1, ry, "2")
+        plot(rubble, rx, ry + 1, "1")
+        plot(rubble, rx + 1, ry + 1, "1")
+
+    s = Sheet("decals", 16)
+    s.add("dec_flowers_white", [flowers_white])
+    s.add("dec_flowers_red", [flowers_red])
+    s.add("dec_tuft", [tuft])
+    s.add("dec_pebbles", [pebbles])
+    s.add("dec_mushrooms", [mushrooms])
+    s.add("dec_log", [log])
+    s.add("dec_cracks", [cracks])
+    s.add("dec_rubble", [rubble])
     return s
 
 
@@ -1509,28 +1764,34 @@ def build_ui():
 
 
 def build_panel():
+    """Ornate 9-slice frame: black edge, bronze trim, bevelled interior."""
     size = 48
     f = blank(size, size)
-    radius_cut = {(0, 0), (1, 0), (0, 1)}  # rounded corner pixels to drop
-
-    def corner_dist(x, y):
-        return min(x, y, size - 1 - x, size - 1 - y)
-
     for y in range(size):
         for x in range(size):
-            cx = min(x, size - 1 - x)
-            cy = min(y, size - 1 - y)
-            if (cx, cy) in radius_cut or (cy, cx) in radius_cut:
-                continue
-            d = corner_dist(x, y)
-            if d == 0 or (cx, cy) == (1, 1):
-                f[y][x] = "0"
+            d = min(x, y, size - 1 - x, size - 1 - y)
+            if d == 0:
+                f[y][x] = "0"          # outer keyline
             elif d == 1:
-                f[y][x] = "4" if (y <= 2 or x <= 2) and not (y >= size - 3 and x >= size - 3) else "2"
+                f[y][x] = "y" if (x <= 1 or y <= 1) else "O"   # lit / shaded trim
             elif d == 2:
-                f[y][x] = "2" if (y >= size - 3 or x >= size - 3) else "1"
+                f[y][x] = "e"          # dark rebate under the trim
             else:
-                f[y][x] = "1"
+                f[y][x] = "1"          # panel field
+    # inner bevel: light along the top-left, shadow along the bottom-right
+    for i in range(3, size - 3):
+        f[3][i] = "2"
+        f[i][3] = "2"
+        f[size - 4][i] = "0"
+        f[i][size - 4] = "0"
+    f[3][3] = "3"
+    # corner studs
+    for cx, cy in [(1, 1), (1, size - 2), (size - 2, 1), (size - 2, size - 2)]:
+        f[cy][cx] = "Y"
+        for ox, oy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nx, ny = cx + ox, cy + oy
+            if 1 <= nx < size - 1 and 1 <= ny < size - 1 and min(nx, ny, size - 1 - nx, size - 1 - ny) == 1:
+                f[ny][nx] = "y"
     s = Sheet("panel", 48)
     s.add("panel", [f])
     return s
@@ -1557,6 +1818,7 @@ def main():
         "brute": build_brute,
         "boss": build_boss_sheet,
         "terrain": build_terrain,
+        "decals": build_decals,
         "props": build_props,
         "items": build_items,
         "ui": build_ui,

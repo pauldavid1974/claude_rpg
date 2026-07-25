@@ -11,6 +11,7 @@ import {
 } from './entities.js';
 import { startAttack, updateCombat } from './combat.js';
 import { routeTo, feetCenter } from './pathfind.js';
+import { drawLighting, drawGrade, drawShadow } from './lighting.js';
 import { updateParticles, drawParticles, drawFloats, sparkle, dust, addFloat } from './particles.js';
 import { openInventory, updateInventory, drawInventory, addItem, hasItem, removeItem } from './inventory.js';
 import { openQuests, updateQuests, drawQuests } from './quests.js';
@@ -489,8 +490,31 @@ function updatePlay(dt) {
 function updateWorldAmbient(dt) {
   updateParticles(dt);
   if (G.shake > 0) G.shake = Math.max(0, G.shake - dt * 18);
+
+  // embers lifting off every torch in view
+  for (const pr of G.map.props) {
+    if (pr.type !== 'torch' || Math.random() > dt * 3) continue;
+    const x = pr.x * TILE + 8, y = pr.y * TILE + 6;
+    if (x < G.cam.x - 16 || x > G.cam.x + VW + 16 ||
+        y < G.cam.y - 16 || y > G.cam.y + VH + 16) continue;
+    G.particles.push({
+      x: x + (Math.random() - 0.5) * 3, y,
+      vx: (Math.random() - 0.5) * 6, vy: -12 - Math.random() * 10, g: 4,
+      life: 0.7 + Math.random() * 0.4, maxLife: 1.1,
+      color: Math.random() < 0.4 ? '#fee761' : '#f77622', size: 1, twinkle: true,
+    });
+  }
+  // dust drifting through the crypt
+  if (G.mapName === 'dungeon' && Math.random() < dt * 8) {
+    G.particles.push({
+      x: G.cam.x + Math.random() * VW, y: G.cam.y + Math.random() * VH,
+      vx: 3 + Math.random() * 5, vy: 4 + Math.random() * 4, g: 0,
+      life: 1.6, maxLife: 1.6, color: '#8b9bb4', size: 1, twinkle: true,
+    });
+  }
+
   // water shimmer: occasional cyan glints on visible water
-  if (Math.random() < dt * 6) {
+  if (Math.random() < dt * 4) {
     const x = G.cam.x + Math.random() * VW, y = G.cam.y + Math.random() * VH;
     const tx = Math.floor(x / TILE), ty = Math.floor(y / TILE);
     const cell = G.map.render[ty] && G.map.render[ty][tx];
@@ -541,10 +565,13 @@ function draw() {
       Math.round((Math.random() - 0.5) * G.shake));
   }
 
+  const camX = Math.round(G.cam.x), camY = Math.round(G.cam.y);
   drawWorld(ctx);
   drawParticles(ctx);
+  drawLighting(ctx, camX, camY);
   drawFloats(ctx);
   ctx.restore();
+  drawGrade(ctx);
 
   drawHud(ctx);
 
@@ -570,8 +597,30 @@ function drawWorld(ctx) {
       const cell = map.render[y][x];
       const fi = frameOf(cell.base, G.time);
       drawAnim(ctx, cell.base, fi, x * TILE - cx, y * TILE - cy);
+      if (cell.decal) drawAnim(ctx, cell.decal, 0, x * TILE - cx, y * TILE - cy);
     }
   }
+
+  // contact shadows go down before anything standing on the ground
+  for (const pr of map.props) {
+    const sx = pr.x * TILE + 8 - cx, sy = pr.y * TILE + 15 - cy;
+    if (sx < -24 || sy < -24 || sx > VW + 24 || sy > VH + 24) continue;
+    if (pr.type === 'torch' || pr.type === 'fence' || pr.type === 'gate') continue;
+    drawShadow(ctx, sx, sy, pr.type === 'sign' ? 4 : 6);
+  }
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const ov = map.render[y][x].overlay;
+    if (!ov) continue;
+    if (ov.startsWith('tree')) drawShadow(ctx, x * TILE + 9 - cx, y * TILE + 15 - cy, 7, 3, 0.32);
+    else if (ov === 'bush') drawShadow(ctx, x * TILE + 8 - cx, y * TILE + 13 - cy, 6, 2.5, 0.30);
+    else if (ov === 'stone') drawShadow(ctx, x * TILE + 8 - cx, y * TILE + 14 - cy, 6, 2.5, 0.30);
+  }
+  for (const n of G.npcs) drawShadow(ctx, n.x + 8 - cx, n.y + 15 - cy, 5);
+  for (const m of G.monsters) {
+    if (m.type === 'bat') { drawShadow(ctx, m.x + 8 - cx, m.y + 20 - cy, 4, 1.6, 0.20); continue; }
+    drawShadow(ctx, m.x + m.size / 2 - cx, m.y + m.size - 2 - cy, m.size * 0.32);
+  }
+  drawShadow(ctx, G.player.x + 8 - cx, G.player.y + 15 - cy, 5);
 
   // depth-sorted drawables: tile overlays (trees etc), props, entities
   const drawables = [];
