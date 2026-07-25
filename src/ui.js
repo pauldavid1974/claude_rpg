@@ -6,6 +6,9 @@ import { input } from './input.js';
 import { sfx } from './audio.js';
 import { xpNeed } from './combat.js';
 import { DODGE } from './entities.js';
+import { quickSlots, countItem, USE_CD } from './inventory.js';
+import { ITEMS } from './items.js';
+import { duckMusic } from './audio.js';
 
 export function drawText(ctx, text, x, y, color = '#ffffff') {
   ctx.font = '7px monospace';
@@ -307,7 +310,10 @@ export function drawHud(ctx) {
       cooldown: cd, tone: cd ? null : 'accent',
     });
     G.ui.hudButtons.push(rb);
+    drawQuickBar(ctx, p, touch);
   }
+
+  drawStatusPips(ctx, p);
 
   if (G.banner) {
     G.banner.t -= 1 / 60;
@@ -321,6 +327,117 @@ export function drawHud(ctx) {
     }
   }
   if (G.muted) drawText(ctx, 'MUTED', 3, VH - 3, '#5a6988');
+}
+
+// --- quick slots -------------------------------------------------------
+// Three pockets along the bottom-left: 1/2/3 on a keyboard, or tap them.
+// They share one cooldown, drawn as a wipe across all three.
+
+function drawQuickBar(ctx, p, touch) {
+  const q = quickSlots();
+  const s = touch ? 22 : 18, gap = 3;
+  const y = VH - s - 4;
+  const cd = p.useCd > 0 ? Math.min(1, p.useCd / USE_CD) : 0;
+  for (let i = 0; i < q.length; i++) {
+    const x = 4 + i * (s + gap);
+    const b = { id: 'quick' + i, x, y, w: s, h: s };
+    const id = q[i];
+    const n = id ? countItem(id) : 0;
+    const hover = inButton(b);
+    ctx.fillStyle = 'rgba(10,8,22,0.78)';
+    roundRect(ctx, x, y, s, s, 4); ctx.fill();
+    if (id && n) {
+      drawAnim(ctx, ITEMS[id].icon, 0, x + (s - 16) / 2, y + (s - 16) / 2);
+      drawText(ctx, '' + n, x + s - 8, y + s - 2, '#ffffff');
+    }
+    if (cd > 0) {
+      ctx.save();
+      roundRect(ctx, x, y, s, s, 4); ctx.clip();
+      ctx.fillStyle = 'rgba(8,7,18,0.6)';
+      ctx.fillRect(x, y, s, s * cd);
+      ctx.restore();
+    }
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = hover && id && n ? '#feae34' : 'rgba(90,105,136,0.55)';
+    roundRect(ctx, x + 0.5, y + 0.5, s - 1, s - 1, 4); ctx.stroke();
+    const pr = pressAmount('hud_quick' + i);
+    if (pr > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = pr / BTN_PRESS * 0.5;
+      ctx.fillStyle = '#fee761';
+      roundRect(ctx, x, y, s, s, 4); ctx.fill();
+      ctx.restore();
+    }
+    drawText(ctx, '' + (i + 1), x + 2, y + 7, '#8b9bb4');
+    G.ui.hudButtons.push(b);
+  }
+}
+
+// Small badges for temporary states, above the quick bar.
+function drawStatusPips(ctx, p) {
+  const pips = [];
+  if (p.poison > 0) pips.push(['PSN', '#63c74d', p.poison]);
+  if (p.hasteT > 0) pips.push(['SWIFT', '#2ce8f5', p.hasteT]);
+  if (p.poisonWard > 0) pips.push(['WARD', '#c0cbdc', p.poisonWard]);
+  let y = VH - (G.mode === 'play' ? 30 : 8);
+  for (const [label, color, t] of pips) {
+    const w = label.length * 5 + 8;
+    ctx.fillStyle = 'rgba(10,8,22,0.72)';
+    roundRect(ctx, 4, y - 8, w, 10, 3); ctx.fill();
+    ctx.globalAlpha = t < 3 && Math.floor(G.time * 6) % 2 ? 0.45 : 1;
+    drawText(ctx, label, 8, y, color);
+    ctx.globalAlpha = 1;
+    y -= 12;
+  }
+}
+
+// --- danger --------------------------------------------------------------
+// Low health takes over the screen: a red pulse on every heartbeat, and at
+// the last sliver the beat quickens, the colour drains out and the music
+// pulls back.
+
+export function updateDanger(dt) {
+  const p = G.player;
+  const D = G.ui.danger || (G.ui.danger = { beat: 0, pulse: 0, level: 0 });
+  if (!p) { D.level = 0; D.pulse = 0; duckMusic(1); return; }
+  const frac = p.maxHp ? p.hp / p.maxHp : 1;
+  const alive = G.mode === 'play' || G.mode === 'dialogue';
+  D.level = !alive || p.hp <= 0 ? 0 : (p.hp <= 2 || frac <= 0.12) ? 2 : frac <= 0.35 ? 1 : 0;
+  if (D.level) {
+    D.beat -= dt;
+    if (D.beat <= 0) {
+      D.beat = D.level === 2 ? 0.6 : 1.0;
+      D.pulse = 1;
+      sfx('heartbeat');
+    }
+  } else {
+    D.beat = 0;
+  }
+  D.pulse = Math.max(0, D.pulse - dt * 2.4);
+  duckMusic(D.level === 2 ? 0.45 : 1);
+}
+
+export function drawDanger(ctx) {
+  const D = G.ui.danger;
+  if (!D || !D.level) return;
+  if (D.level === 2) {                    // colour drains first...
+    ctx.save();
+    ctx.globalCompositeOperation = 'saturation';
+    ctx.globalAlpha = 0.5 + D.pulse * 0.2;
+    ctx.fillStyle = 'hsl(0,0%,50%)';
+    ctx.fillRect(0, 0, VW, VH);
+    ctx.restore();
+  }
+  const base = D.level === 2 ? 0.40 : 0.16;   // ...so the red still reads
+  const a = base + D.pulse * (D.level === 2 ? 0.34 : 0.20);
+  const g = ctx.createRadialGradient(
+    VW / 2, VH / 2, Math.min(VW, VH) * (0.30 - D.pulse * 0.07),
+    VW / 2, VH / 2, Math.max(VW, VH) * 0.66);
+  g.addColorStop(0, 'rgba(228,59,68,0)');
+  g.addColorStop(1, `rgba(190,22,34,${a})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, VW, VH);
 }
 
 // --- screens -----------------------------------------------------------

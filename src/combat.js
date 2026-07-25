@@ -78,10 +78,10 @@ export function hitMonster(m, dmg, ang, poiseDmg = 1) {
 
 const DROP_TABLE = {
   slime:    [['gel', 0.6]],
-  skeleton: [['bone', 0.65]],
-  bat:      [],
-  archer:   [['potion', 0.15]],
-  brute:    [['potion', 0.3]],
+  skeleton: [['bone', 0.65], ['knife', 0.12]],
+  bat:      [['antidote', 0.08]],
+  archer:   [['potion', 0.15], ['knife', 0.25]],
+  brute:    [['potion', 0.3], ['bomb', 0.15]],
   boss:     [['amulet', 1]],
 };
 
@@ -148,6 +148,35 @@ export function damagePlayer(atk, fromX, fromY) {
   }
 }
 
+// --- thrown consumables -------------------------------------------------
+
+export function playerThrow(kind, ang, dmg) {
+  const p = G.player;
+  const speed = kind === 'bomb' ? 100 : 165;
+  G.projectiles.push({
+    x: p.x + 8, y: p.y + 10,
+    vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
+    dmg, kind, ally: true,
+    life: kind === 'bomb' ? 0.62 : 1.2,
+    spin: 0,
+  });
+}
+
+export function explode(x, y, dmg) {
+  sfx('boss');
+  G.shake = Math.max(G.shake, 6);
+  G.hitstop = 0.07;
+  for (let i = 0; i < 26; i++) {
+    spawnPix(x, y, i % 3 ? '#feae34' : '#fee761', 6, 110, 0.45);
+  }
+  for (const m of [...G.monsters]) {
+    const mx = m.x + m.size / 2, my = m.y + m.size / 2;
+    const d = Math.hypot(mx - x, my - y);
+    if (d > 36) continue;
+    hitMonster(m, Math.max(1, Math.round(dmg * (1 - d / 52))), Math.atan2(my - y, mx - x), 3);
+  }
+}
+
 export function monsterShoot(x, y, ang, speed, dmg, boss = false) {
   G.projectiles.push({
     x, y, vx: Math.cos(ang) * speed, vy: Math.sin(ang) * speed,
@@ -163,9 +192,25 @@ function updateProjectiles(dt) {
     const pr = G.projectiles[i];
     pr.x += pr.vx * dt; pr.y += pr.vy * dt;
     pr.life -= dt;
-    if (pr.life <= 0 || isSolidAt(G.map, pr.x, pr.y)) {
-      spawnPix(pr.x, pr.y, pr.boss ? '#b55088' : '#c0cbdc', 3, 30, 0.2);
+    pr.spin = (pr.spin || 0) + dt * 14;
+    const hitWall = isSolidAt(G.map, pr.x, pr.y);
+    if (pr.life <= 0 || hitWall) {
+      if (pr.kind === 'bomb') explode(pr.x, pr.y, pr.dmg);
+      else spawnPix(pr.x, pr.y, pr.boss ? '#b55088' : '#c0cbdc', 3, 30, 0.2);
       G.projectiles.splice(i, 1);
+      continue;
+    }
+    if (pr.ally) {                       // thrown by the player: hits monsters
+      let struck = false;
+      for (const m of G.monsters) {
+        const mb = { x: m.x + 2, y: m.y + m.size * 0.3, w: m.size - 4, h: m.size * 0.65 };
+        if (pr.x < mb.x || pr.x > mb.x + mb.w || pr.y < mb.y || pr.y > mb.y + mb.h) continue;
+        struck = true;
+        if (pr.kind === 'bomb') explode(pr.x, pr.y, pr.dmg);
+        else hitMonster(m, pr.dmg, Math.atan2(pr.vy, pr.vx), 1);
+        break;
+      }
+      if (struck) G.projectiles.splice(i, 1);
       continue;
     }
     const fb = feetBox(p);

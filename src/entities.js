@@ -63,6 +63,8 @@ export function createPlayer() {
     inv: [{ id: 'dagger', n: 1 }, { id: 'potion', n: 2 }],
     attackT: 0, attackDir: 'down', iframes: 0,
     dodgeT: 0, dodgeCd: 0, dodgeAng: 0,
+    useCd: 0, hasteT: 0, poison: 0, poisonWard: 0, poisonTick: 0,
+    quick: ['potion', null, null],
     speed: 72,
   };
 }
@@ -107,8 +109,34 @@ export function playerStats() {
 }
 
 // dx/dy: desired movement vector (any magnitude; normalized here).
+// Venom: a slow bleed you can wait out, cut short with an antidote.
+function tickStatus(dt) {
+  const p = G.player;
+  if (p.useCd > 0) p.useCd -= dt;
+  if (p.hasteT > 0) p.hasteT -= dt;
+  if (p.poisonWard > 0) p.poisonWard -= dt;
+  if (p.poison > 0) {
+    p.poison -= dt;
+    p.poisonTick -= dt;
+    if (p.poisonTick <= 0) {
+      p.poisonTick = 1.4;
+      p.hp -= 1;
+      spawnPix(p.x + 8, p.y + 8, '#63c74d', 4, 26, 0.4);
+      if (p.hp <= 0) { p.hp = 0; G.mode = 'gameover'; G.ui.gameoverT = 0; }
+    }
+  }
+}
+
+export function poisonPlayer(seconds) {
+  const p = G.player;
+  if (p.poisonWard > 0 || p.iframes > 0) return;
+  p.poison = Math.max(p.poison, seconds);
+  p.poisonTick = Math.min(p.poisonTick || 1.4, 1.0);
+}
+
 export function updatePlayerMovement(dt, dx, dy) {
   const p = G.player;
+  tickStatus(dt);
   if (p.dodgeCd > 0) p.dodgeCd -= dt;
   if (p.dodgeT > 0) {
     p.dodgeT -= dt;
@@ -127,7 +155,7 @@ export function updatePlayerMovement(dt, dx, dy) {
     if (Math.abs(dx) > Math.abs(dy)) p.dir = dx < 0 ? 'left' : 'right';
     else p.dir = dy < 0 ? 'up' : 'down';
     const len = Math.hypot(dx, dy);
-    const step = p.speed * dt;
+    const step = p.speed * (p.hasteT > 0 ? 1.5 : 1) * dt;
     moveEntity(p, dx / len * step, 0);
     moveEntity(p, 0, dy / len * step);
     p.animT += dt;

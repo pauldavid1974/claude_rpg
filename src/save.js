@@ -10,7 +10,7 @@ export function saveGame() {
   const data = {
     player: {
       hp: p.hp, maxHp: p.maxHp, level: p.level, xp: p.xp, gold: p.gold,
-      weapon: p.weapon, armor: p.armor, inv: p.inv,
+      weapon: p.weapon, armor: p.armor, inv: p.inv, quick: p.quick,
       x: p.x, y: p.y,
     },
     mapName: G.mapName,

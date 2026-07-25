@@ -10,6 +10,7 @@ const KEYMAP = {
   Space: 'attack', KeyJ: 'attack',
   ShiftLeft: 'dodge', ShiftRight: 'dodge', KeyK: 'dodge',
   KeyE: 'interact', Enter: 'interact',
+  Digit1: 'q1', Digit2: 'q2', Digit3: 'q3',
   KeyI: 'inv', Tab: 'inv',
   KeyQ: 'quest',
   Escape: 'pause',

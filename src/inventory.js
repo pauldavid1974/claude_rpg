@@ -4,15 +4,46 @@ import { G, VW, VH } from './state.js';
 import { ITEMS } from './items.js';
 import { input } from './input.js';
 import { sfx } from './audio.js';
-import { addFloat } from './particles.js';
+import { addFloat, sparkle } from './particles.js';
 import { drawPanel, drawText, drawTextC, drawHeading } from './ui.js';
 import { drawAnim } from './assets.js';
+import { playerThrow } from './combat.js';
 
 export const COLS = 6, ROWS = 4;
+export const QUICK_SLOTS = 3;
+export const USE_CD = 0.7;
+
+const CONSUMABLE = { potion: 1, throw: 1, cure: 1, buff: 1 };
+export function isConsumable(id) { return !!CONSUMABLE[ITEMS[id]?.type]; }
+
+export function quickSlots() {
+  const p = G.player;
+  if (!p.quick) p.quick = new Array(QUICK_SLOTS).fill(null);
+  return p.quick;
+}
+
+// A new kind of consumable claims the first free slot, so the bar fills
+// itself as you find things and never needs opening a menu to be useful.
+function autoAssign(id) {
+  if (!isConsumable(id)) return;
+  const q = quickSlots();
+  if (q.includes(id)) return;
+  const free = q.indexOf(null);
+  if (free >= 0) q[free] = id;
+}
+
+export function assignQuick(i, id) {
+  const q = quickSlots();
+  const was = q.indexOf(id);
+  if (was >= 0) q[was] = q[i];      // swap rather than duplicate
+  q[i] = id;
+  sfx('menu');
+}
 
 export function addItem(id, n = 1) {
   const inv = G.player.inv;
   const def = ITEMS[id];
+  autoAssign(id);
   if (def.stack) {
     const slot = inv.find(s => s && s.id === id);
     if (slot) { slot.n += n; return true; }
@@ -50,6 +81,57 @@ export function openInventory() {
   sfx('menu');
 }
 
+// One path for every consumable, whether it is used from the grid or from
+// a quick slot.  They share one short cooldown so a fight cannot be won by
+// mashing the whole bag at once.
+export function useConsumable(id) {
+  const p = G.player;
+  const def = ITEMS[id];
+  if (!def || !countItem(id)) { sfx('deny'); return false; }
+  if (p.useCd > 0) { sfx('deny'); return false; }
+  switch (def.type) {
+    case 'potion':
+      if (p.hp >= p.maxHp) { sfx('deny'); return false; }
+      p.hp = Math.min(p.maxHp, p.hp + def.heal);
+      sfx('heal');
+      addFloat('+HP', p.x + 8, p.y - 4, '#63c74d');
+      sparkle(p.x + 8, p.y + 6, 8, '#63c74d');
+      break;
+    case 'cure':
+      if (!p.poison && p.poisonWard > 0) { sfx('deny'); return false; }
+      p.poison = 0;
+      p.poisonWard = 20;
+      sfx('heal');
+      addFloat('CURED', p.x + 8, p.y - 4, '#63c74d');
+      break;
+    case 'buff':
+      p.hasteT = 8;
+      sfx('upgrade');
+      addFloat('SWIFT', p.x + 8, p.y - 4, '#2ce8f5');
+      sparkle(p.x + 8, p.y + 6, 10, '#2ce8f5');
+      break;
+    case 'throw': {
+      const a = p.dir === 'left' ? Math.PI : p.dir === 'right' ? 0
+              : p.dir === 'up' ? -Math.PI / 2 : Math.PI / 2;
+      playerThrow(id, a, def.dmg);
+      sfx('swing');
+      break;
+    }
+    default:
+      sfx('deny');
+      return false;
+  }
+  removeItem(id, 1);
+  p.useCd = USE_CD;
+  return true;
+}
+
+export function useQuick(i) {
+  const id = quickSlots()[i];
+  if (!id) { sfx('deny'); return false; }
+  return useConsumable(id);
+}
+
 function useSelected() {
   const st = G.ui.inv;
   const slot = G.player.inv[st.sel];
@@ -62,12 +144,8 @@ function useSelected() {
   } else if (def.type === 'armor') {
     p.armor = p.armor === slot.id ? null : slot.id;
     sfx('menu');
-  } else if (def.type === 'potion') {
-    if (p.hp >= p.maxHp) { sfx('deny'); return; }
-    p.hp = Math.min(p.maxHp, p.hp + def.heal);
-    removeItem(slot.id, 1);
-    sfx('heal');
-    addFloat('+HP', p.x + 8, p.y - 4, '#63c74d');
+  } else if (isConsumable(slot.id)) {
+    useConsumable(slot.id);
   } else {
     sfx('deny');
   }
@@ -101,6 +179,13 @@ export function updateInventory(dt) {
   if (input.pressed.down) { st.sel = (st.sel + COLS) % (COLS * ROWS); sfx('menu'); }
   if (input.pressed.interact) useSelected();
   if (input.pressed.attack) dropSelected();
+  // 1-3 bind the selected consumable to a quick slot
+  for (let i = 0; i < QUICK_SLOTS; i++) {
+    if (!input.pressed['q' + (i + 1)]) continue;
+    const slot = G.player.inv[st.sel];
+    if (slot && isConsumable(slot.id)) assignQuick(i, slot.id);
+    else sfx('deny');
+  }
   // mouse: hover/click cells; click outside the panels closes
   const { mx, my, totalW, totalH, cells } = layout();
   let onCell = false;
@@ -177,8 +262,13 @@ export function drawInventory(ctx) {
     drawWrapped(ctx, def.desc || '', dx + 8, dy + 26, dw - 16, '#c0cbdc');
     const hint = def.type === 'weapon' || def.type === 'armor'
       ? (p.weapon === slot.id || p.armor === slot.id ? 'E/click: unequip' : 'E/click: equip')
-      : def.type === 'potion' ? 'E/click: drink' : '';
-    if (hint) drawText(ctx, hint, dx + 8, dy + dh - 22, '#8b9bb4');
+      : isConsumable(slot.id) ? 'E/click: use' : '';
+    if (hint) drawText(ctx, hint, dx + 8, dy + dh - 32, '#8b9bb4');
+    if (isConsumable(slot.id)) {
+      const at = quickSlots().indexOf(slot.id);
+      drawText(ctx, at >= 0 ? '1-3: rebind (now ' + (at + 1) + ')' : '1-3: quick slot',
+               dx + 8, dy + dh - 22, at >= 0 ? '#fee761' : '#8b9bb4');
+    }
     if (def.type !== 'quest') drawText(ctx, 'Space: drop', dx + 8, dy + dh - 12, '#8b9bb4');
   } else {
     drawText(ctx, 'empty', dx + 8, dy + 14, '#5a6988');

@@ -11,11 +11,11 @@ import { drawAnim } from './assets.js';
 export const SHOPS = {
   general: {
     name: 'General Store',
-    stock: ['potion', 'potion_big', 'leather'],
+    stock: ['potion', 'potion_big', 'antidote', 'draught', 'leather'],
   },
   blacksmith: {
     name: "Edda's Smithy",
-    stock: ['dagger', 'sword', 'greatsword', 'chain', 'plate'],
+    stock: ['dagger', 'sword', 'greatsword', 'knife', 'bomb', 'chain', 'plate'],
   },
 };
 

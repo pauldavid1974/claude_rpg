@@ -890,6 +890,38 @@
    "h": 16,
    "fps": 0
   },
+  "item_knife": {
+   "sheet": "items",
+   "row": 14,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_bomb": {
+   "sheet": "items",
+   "row": 15,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_antidote": {
+   "sheet": "items",
+   "row": 16,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_draught": {
+   "sheet": "items",
+   "row": 17,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
   "heart_full": {
    "sheet": "ui",
    "row": 0,

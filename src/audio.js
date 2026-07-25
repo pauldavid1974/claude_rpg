@@ -8,6 +8,7 @@ let master = null;
 let musicGain = null;
 let musicTimer = null;
 let currentTrack = null;
+let duck = 1;
 
 try { G.musicOn = localStorage.getItem('emberdale_music') !== '0'; } catch (e) { /* default on */ }
 
@@ -18,14 +19,22 @@ export function initAudio() {
   master.gain.value = 0.5;
   master.connect(ac.destination);
   musicGain = ac.createGain();
-  musicGain.gain.value = G.musicOn ? 0.42 : 0;
+  musicGain.gain.value = (G.musicOn ? 0.42 : 0) * duck;
   musicGain.connect(master);
 }
 
 export function setMusicEnabled(on) {
   G.musicOn = on;
-  if (musicGain) musicGain.gain.value = on ? 0.42 : 0;
+  if (musicGain) musicGain.gain.value = (on ? 0.42 : 0) * duck;
   try { localStorage.setItem('emberdale_music', on ? '1' : '0'); } catch (e) { /* ignore */ }
+}
+
+// Pull the music back without touching the player's on/off choice - used
+// when the game wants the room to go quiet.
+export function duckMusic(amount) {
+  if (amount === duck) return;
+  duck = amount;
+  if (musicGain) musicGain.gain.value = (G.musicOn ? 0.42 : 0) * duck;
 }
 
 export function setMuted(m) {

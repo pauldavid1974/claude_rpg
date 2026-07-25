@@ -8,19 +8,23 @@ import { buildMap, outsideCell } from './maps.js';
 import {
   createPlayer, updatePlayerMovement, updateMonster, updateNpc,
   spawnMonster, spawnNpc, feetBox, moveEntity, facePoint,
-  startDodge, canDodge, monsterAttackBox, attackProfile, DODGE,
+  startDodge, canDodge, monsterAttackBox, attackProfile, poisonPlayer, DODGE,
 } from './entities.js';
 import { startAttack, updateCombat, hitMonster } from './combat.js';
 import { routeTo, feetCenter } from './pathfind.js';
 import { drawLighting, drawGrade, drawShadow } from './lighting.js';
 import { updateParticles, drawParticles, drawFloats, sparkle, dust, addFloat } from './particles.js';
-import { openInventory, updateInventory, drawInventory, addItem, hasItem, removeItem } from './inventory.js';
+import {
+  openInventory, updateInventory, drawInventory, addItem, hasItem, removeItem,
+  useQuick, useConsumable, countItem, QUICK_SLOTS,
+} from './inventory.js';
 import { openQuests, updateQuests, drawQuests } from './quests.js';
 import { updateDialogue, drawDialogue, talkTo, say, dialogueState } from './dialogue.js';
-import { updateShop, drawShop } from './shops.js';
+import { updateShop, drawShop, SHOPS } from './shops.js';
 import {
   drawHud, drawTitle, updateTitle, drawPause, updatePause,
   drawGameover, drawTransition, drawText, pressKey, tickPresses,
+  updateDanger, drawDanger,
 } from './ui.js';
 import { saveGame, loadGame, clearSave } from './save.js';
 import { ITEMS } from './items.js';
@@ -278,6 +282,7 @@ function loop(ts) {
 
   if (input.pressed.mute) { toggleMute(); saveGame(); }
   tickPresses(dtReal);
+  updateDanger(dtReal);
   if (G.mode !== 'play') G.ui.goal = null;   // menus/dialogue cancel mouse goals
 
   draw();
@@ -293,6 +298,7 @@ function hudButtonClick() {
       if (b.id === 'inv') openInventory();
       else if (b.id === 'quest') openQuests();
       else if (b.id === 'dodge') dodgeNow();
+      else if (b.id.startsWith('quick')) useQuick(+b.id.slice(5));
       else { G.mode = 'pause'; G.ui.pause = { sel: 0 }; sfx('menu'); }
       return true;
     }
@@ -396,6 +402,9 @@ function updatePlay(dt) {
   if (input.pressed.interact) { tryInteract(); if (G.mode !== 'play') return; }
   if (input.pressed.attack) startAttack();
   if (input.pressed.dodge) dodgeNow();
+  for (let i = 0; i < QUICK_SLOTS; i++) {
+    if (input.pressed['q' + (i + 1)]) { pressKey('hud_quick' + i); useQuick(i); }
+  }
 
   // --- mouse controls -------------------------------------------------
   // A click sets a movement goal the player walks to on their own, routed
@@ -609,6 +618,7 @@ function draw() {
   drawFloats(ctx);
   ctx.restore();
   drawGrade(ctx);
+  drawDanger(ctx);
 
   drawHud(ctx);
 
@@ -736,6 +746,25 @@ function drawWorld(ctx) {
 
   // projectiles on top
   for (const pr of G.projectiles) {
+    if (pr.ally) {
+      const px = Math.round(pr.x - cx), py = Math.round(pr.y - cy);
+      if (pr.kind === 'bomb') {
+        ctx.fillStyle = '#262b44';
+        ctx.beginPath(); ctx.arc(px, py, 3, 0, 7); ctx.fill();
+        ctx.fillStyle = Math.floor(G.time * 20) % 2 ? '#fee761' : '#f77622';
+        ctx.fillRect(px + 1, py - 5, 1, 1);
+      } else {
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(pr.spin);
+        ctx.fillStyle = '#c0cbdc';
+        ctx.fillRect(-3, -1, 6, 1);
+        ctx.fillStyle = '#feae34';
+        ctx.fillRect(-3, 0, 2, 1);
+        ctx.restore();
+      }
+      continue;
+    }
     ctx.fillStyle = pr.boss ? '#b55088' : '#c0cbdc';
     ctx.fillRect(Math.round(pr.x - 1 - cx), Math.round(pr.y - 1 - cy), 3, 3);
     ctx.fillStyle = pr.boss ? '#68386c' : '#5a6988';
@@ -855,5 +884,8 @@ function drawMonster(ctx, m, cx, cy) {
   }
 }
 
-window.EMBER = { G, changeMap, dialogueState, spawnMonster, startDodge, hitMonster };  // debug/testing handle
+window.EMBER = {  // debug/testing handle
+  G, changeMap, dialogueState, spawnMonster, startDodge, hitMonster,
+  addItem, countItem, useQuick, useConsumable, poisonPlayer, SHOPS,
+};
 boot();
