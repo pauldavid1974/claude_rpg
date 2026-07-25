@@ -1722,6 +1722,33 @@ def build_ui():
             if full[y][x] != TRANSPARENT:
                 heart_half[y][x] = full[y][x]
 
+    # Compact hearts for the HUD - 7x6 of art parked in the top-left of the
+    # cell, so a long health bar stays readable instead of crowding.
+    heart_s_full = F(
+        ".00.00..........",
+        "06FrrR0.........",
+        "0rrrrrR0........",
+        ".0rrrR0.........",
+        "..0rR0..........",
+        "...00...........",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+        "................",
+    )
+    heart_s_empty = recolor(heart_s_full, {"r": "1", "R": "1", "F": "2", "6": "2"})
+    heart_s_half = [row[:] for row in heart_s_empty]
+    for y in range(16):
+        for x in range(4):
+            if heart_s_full[y][x] != TRANSPARENT:
+                heart_s_half[y][x] = heart_s_full[y][x]
+
     def coin_full():
         return F(
             "................",
@@ -1782,6 +1809,9 @@ def build_ui():
     s.add("heart_full", [heart_full])
     s.add("heart_half", [heart_half])
     s.add("heart_empty", [heart_empty])
+    s.add("heart_s_full", [heart_s_full])
+    s.add("heart_s_half", [heart_s_half])
+    s.add("heart_s_empty", [heart_s_empty])
     s.add("coin", [coin_full(), coin_mid, coin_thin, mirror(coin_mid)], 8)
     return s
 

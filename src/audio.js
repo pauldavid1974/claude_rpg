@@ -93,6 +93,17 @@ const SFX = {
   heal:   (t) => osc('triangle', mid(72), t, 0.25, 0.2, master, mid(84)),
   boss:   (t) => { osc('sawtooth', 70, t, 0.7, 0.3, master, 45); noise(t, 0.5, 0.2, master, 200); },
   slash_hit:(t) => { noise(t, 0.06, 0.3, master, 1200); osc('square', 220, t, 0.07, 0.15, master, 90); },
+  type:   (t) => osc('square', 1050 + Math.random() * 260, t, 0.022, 0.035, master),
+  heartbeat:(t) => { osc('sine', 62, t, 0.13, 0.5, master, 40);
+                     osc('sine', 55, t + 0.17, 0.16, 0.34, master, 36); },
+  dodge:  (t) => { noise(t, 0.14, 0.16, master, 900); osc('square', 420, t, 0.1, 0.06, master, 150); },
+  parry:  (t) => { osc('square', 900, t, 0.07, 0.14, master, 1500); noise(t, 0.05, 0.2, master, 4000); },
+  crit:   (t) => { noise(t, 0.09, 0.4, master, 1500); osc('square', 300, t, 0.12, 0.2, master, 70);
+                   osc('square', 900, t, 0.09, 0.1, master, 1400); },
+  charge: (t) => osc('triangle', 180, t, 0.55, 0.09, master, 620),
+  break:  (t) => { noise(t, 0.16, 0.32, master, 700); osc('square', 130, t, 0.12, 0.14, master, 50); },
+  upgrade:(t) => [72, 76, 79, 84].forEach((n, i) => osc('triangle', mid(n), t + i * 0.07, 0.2, 0.15, master)),
+  telegraph:(t) => osc('sawtooth', 240, t, 0.18, 0.07, master, 380),
 };
 
 export function sfx(name) {

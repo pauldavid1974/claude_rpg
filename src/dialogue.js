@@ -4,7 +4,10 @@
 import { G, VW, VH } from './state.js';
 import { input } from './input.js';
 import { sfx } from './audio.js';
-import { drawPanel, drawText, drawHeading } from './ui.js';
+import {
+  drawPanel, drawText, drawHeading,
+  drawSquishButton, pressKey, pressAmount, inButton,
+} from './ui.js';
 import {
   isActive, isDone, canTurnIn, startQuest, turnIn, questProgress, QUESTS,
 } from './quests.js';
@@ -13,10 +16,15 @@ import { openShop } from './shops.js';
 
 // A script: { name, pages: [str], choice?: {prompt, yes, no, onYes, onNo}, onDone }
 let script = null, page = 0, chars = 0, choiceSel = 0, choosing = false;
+let typeAcc = 0;
+
+export function dialogueState() {
+  return { active: !!script, page, chars, choosing, choiceSel };
+}
 
 export function say(name, pages, extra = {}) {
   script = { name, pages, ...extra };
-  page = 0; chars = 0; choosing = false; choiceSel = 0;
+  page = 0; chars = 0; choosing = false; choiceSel = 0; typeAcc = 0;
   G.mode = 'dialogue';
 }
 
@@ -37,43 +45,75 @@ function wrapLines(ctx, text, maxW) {
   return out;
 }
 
+// Choices are real buttons: side by side when both labels fit half the
+// panel, stacked when they don't (narrow phones).
 function dialogueLayout(ctx) {
   const w = Math.min(272, VW - 12);
   const lines = wrapLines(ctx, script.pages[page], w - 24);
-  const showChoices = choosing && script.choice;
+  const showChoices = choosing && !!script.choice;
   const textH = lines.length * 10;
-  const h = Math.max(40, 12 + textH + (showChoices ? 30 : 6));
-  const x = Math.round((VW - w) / 2), y = VH - h - 8;
-  return { x, y, w, h, lines, showChoices, choiceY: y + 12 + textH + 10 };
-}
+  const bh = 15, gap = 4, pad = 12;
 
-function choiceRow(i) {
-  const L = dialogueLayout(G.ctx);
-  const cy = L.choiceY + i * 12;
-  return input.mouse.x > L.x + 8 && input.mouse.x < L.x + L.w - 8 &&
-         input.mouse.y > cy - 9 && input.mouse.y < cy + 3;
+  let side = false, bw = 0, rows = 0;
+  if (showChoices) {
+    ctx.font = '7px monospace';
+    const lw = Math.max(ctx.measureText(script.choice.yes).width,
+                        ctx.measureText(script.choice.no).width);
+    const half = (w - pad * 2 - gap) / 2;
+    side = lw + 14 <= half;
+    bw = Math.floor(side ? half : w - pad * 2);
+    rows = side ? 1 : 2;
+  }
+  const choicesH = showChoices ? rows * (bh + gap) + 2 : 0;
+  const h = Math.max(40, 12 + textH + (showChoices ? choicesH + 2 : 6));
+  const x = Math.round((VW - w) / 2), y = VH - h - 8;
+  const cy = y + 12 + textH + 2;
+
+  const btns = [];
+  if (showChoices) {
+    for (const [i, label] of [script.choice.yes, script.choice.no].entries()) {
+      btns.push({
+        label, w: bw, h: bh,
+        x: x + pad + (side && i === 1 ? bw + gap : 0),
+        y: cy + (side ? 0 : i * (bh + gap)),
+      });
+    }
+  }
+  return { x, y, w, h, lines, showChoices, btns, side };
 }
 
 export function updateDialogue(dt) {
   const advance = input.pressed.interact || input.pressed.attack || input.mouse.clicked;
   const text = script.pages[page];
   if (chars < text.length) {
+    const before = Math.floor(chars);
     chars = Math.min(text.length, chars + dt * 45);
     if (advance) chars = text.length; // skip typing
+    else {
+      // a soft key-click every few glyphs, never on whitespace
+      const after = Math.floor(chars);
+      typeAcc += after - before;
+      if (typeAcc >= 2) {
+        typeAcc = 0;
+        if (!/\s/.test(text[after - 1] || ' ')) sfx('type');
+      }
+    }
     return;
   }
   if (choosing) {
+    const L = dialogueLayout(G.ctx);
     if (input.pressed.up || input.pressed.down || input.pressed.left || input.pressed.right) {
       choiceSel = 1 - choiceSel; sfx('menu');
     }
     let confirm = input.pressed.interact;
     for (const i of [0, 1]) {
-      if (choiceRow(i)) {
+      if (inButton(L.btns[i])) {
         if (choiceSel !== i) { choiceSel = i; sfx('menu'); }
         if (input.mouse.clicked) confirm = true;
       }
     }
     if (confirm) {
+      pressKey('dlg_' + choiceSel);
       const c = script.choice;
       const cb = choiceSel === 0 ? c.onYes : c.onNo;
       script = null;
@@ -99,7 +139,7 @@ export function updateDialogue(dt) {
 
 export function drawDialogue(ctx) {
   if (!script) return;
-  const { x, y, w, h, lines, showChoices, choiceY } = dialogueLayout(ctx);
+  const { x, y, w, h, lines, showChoices, btns } = dialogueLayout(ctx);
   drawPanel(ctx, x, y, w, h);
   if (script.name) {
     ctx.font = '15px "Jacquard 12"';
@@ -118,16 +158,14 @@ export function drawDialogue(ctx) {
   }
   const full = chars >= script.pages[page].length;
   if (full && showChoices) {
-    const c = script.choice;
-    for (const [i, label] of [c.yes, c.no].entries()) {
-      const on = choiceSel === i;
-      if (on) {
-        ctx.fillStyle = '#3a4466';
-        ctx.fillRect(x + 8, choiceY + i * 12 - 9, w - 16, 12);
-      }
-      drawText(ctx, (on ? '> ' : '  ') + label, x + 12, choiceY + i * 12,
-               on ? '#fee761' : '#c0cbdc');
-    }
+    btns.forEach((b, i) => {
+      drawSquishButton(ctx, b.x, b.y, b.w, b.h, b.label, {
+        selected: choiceSel === i,
+        hover: inButton(b),
+        press: pressAmount('dlg_' + i),
+        tone: choiceSel === i ? 'accent' : null,
+      });
+    });
   } else if (full && Math.floor(G.time * 2.5) % 2) {
     drawText(ctx, 'v', x + w - 14, y + h - 6, '#feae34');
   }

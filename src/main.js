@@ -15,11 +15,11 @@ import { drawLighting, drawGrade, drawShadow } from './lighting.js';
 import { updateParticles, drawParticles, drawFloats, sparkle, dust, addFloat } from './particles.js';
 import { openInventory, updateInventory, drawInventory, addItem, hasItem, removeItem } from './inventory.js';
 import { openQuests, updateQuests, drawQuests } from './quests.js';
-import { updateDialogue, drawDialogue, talkTo, say } from './dialogue.js';
+import { updateDialogue, drawDialogue, talkTo, say, dialogueState } from './dialogue.js';
 import { updateShop, drawShop } from './shops.js';
 import {
   drawHud, drawTitle, updateTitle, drawPause, updatePause,
-  drawGameover, drawTransition, drawText, BTN_PRESS,
+  drawGameover, drawTransition, drawText, pressKey, tickPresses,
 } from './ui.js';
 import { saveGame, loadGame, clearSave } from './save.js';
 import { ITEMS } from './items.js';
@@ -276,9 +276,7 @@ function loop(ts) {
   }
 
   if (input.pressed.mute) { toggleMute(); saveGame(); }
-  for (const k in G.ui.btnPress || {}) {
-    if (G.ui.btnPress[k] > 0) G.ui.btnPress[k] = Math.max(0, G.ui.btnPress[k] - dtReal);
-  }
+  tickPresses(dtReal);
   if (G.mode !== 'play') G.ui.goal = null;   // menus/dialogue cancel mouse goals
 
   draw();
@@ -290,8 +288,7 @@ function hudButtonClick() {
   for (const b of G.ui.hudButtons || []) {
     if (input.mouse.x >= b.x && input.mouse.x < b.x + b.w &&
         input.mouse.y >= b.y && input.mouse.y < b.y + b.h) {
-      G.ui.btnPress = G.ui.btnPress || {};
-      G.ui.btnPress[b.id] = BTN_PRESS;
+      pressKey('hud_' + b.id);
       if (b.id === 'inv') openInventory();
       else if (b.id === 'quest') openQuests();
       else { G.mode = 'pause'; G.ui.pause = { sel: 0 }; sfx('menu'); }
@@ -765,5 +762,5 @@ function drawMonster(ctx, m, cx, cy) {
   }
 }
 
-window.EMBER = { G, changeMap };  // debug/testing handle
+window.EMBER = { G, changeMap, dialogueState };  // debug/testing handle
 boot();

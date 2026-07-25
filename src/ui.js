@@ -62,65 +62,122 @@ export function drawPanel(ctx, x, y, w, h) {
 
 // --- HUD ---------------------------------------------------------------
 
-// Press feedback: a squash-then-overshoot bounce plus a gleam that
-// sweeps across the face. `e` runs 0 -> 1 over the press.
-function pressScale(e) {
-  if (e < 0.35) return 1 - 0.14 * (e / 0.35);
-  if (e < 0.7) return 0.86 + 0.22 * ((e - 0.35) / 0.35);
-  return 1.08 - 0.08 * ((e - 0.7) / 0.3);
+// --- squishy buttons ---------------------------------------------------
+// One widget for every button in the game: HUD, dialogue choices, pause
+// and title menus. Rounded, and it squashes wide then springs tall when
+// pressed before settling back.
+
+export const BTN_PRESS = 0.32;
+
+export function pressKey(id) {
+  G.ui.press = G.ui.press || {};
+  G.ui.press[id] = BTN_PRESS;
 }
 
-function drawButton(ctx, x, y, w, h, label, hover, press) {
+export function pressAmount(id) {
+  return (G.ui.press && G.ui.press[id]) || 0;
+}
+
+export function tickPresses(dt) {
+  const P = G.ui.press;
+  if (!P) return;
+  for (const k in P) if (P[k] > 0) P[k] = Math.max(0, P[k] - dt);
+}
+
+// squash wide -> spring tall -> settle
+function squish(e) {
+  if (e < 0.28) { const k = e / 0.28; return [1 + 0.20 * k, 1 - 0.20 * k]; }
+  if (e < 0.62) { const k = (e - 0.28) / 0.34; return [1.20 - 0.32 * k, 0.80 + 0.34 * k]; }
+  const k = (e - 0.62) / 0.38;
+  return [0.88 + 0.12 * k, 1.14 - 0.14 * k];
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// state: { hover, press (0..BTN_PRESS), selected, font, size, tone }
+export function drawSquishButton(ctx, x, y, w, h, label, state = {}) {
+  const press = state.press || 0;
   const e = press > 0 ? 1 - press / BTN_PRESS : 0;
-  const s = press > 0 ? pressScale(e) : (hover ? 1.04 : 1);
+  const [sx, sy] = press > 0 ? squish(e)
+                 : (state.hover || state.selected) ? [1.035, 1.035] : [1, 1];
+  const lit = state.hover || state.selected || press > 0;
+  const r = Math.max(3, Math.min(h / 2.2, 6));
+
   ctx.save();
   ctx.translate(x + w / 2, y + h / 2);
-  ctx.scale(s, s);
+  ctx.scale(sx, sy);
   ctx.translate(-w / 2, -h / 2);
 
-  const lit = hover || press > 0;
-  ctx.fillStyle = '#181425';                       // drop shadow
-  ctx.fillRect(1, 2, w, h);
-  const g = ctx.createLinearGradient(0, 0, 0, h);  // face
-  g.addColorStop(0, lit ? '#4a5578' : '#333c5c');
-  g.addColorStop(1, lit ? '#2b3350' : '#1e2540');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = lit ? '#8b9bb4' : '#5a6988';     // top bevel
-  ctx.fillRect(1, 1, w - 2, 1);
-  ctx.fillStyle = '#12142a';                       // bottom shade
-  ctx.fillRect(1, h - 2, w - 2, 1);
-  ctx.strokeStyle = lit ? '#feae34' : '#181425';   // border
-  ctx.lineWidth = 1;
-  ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
-  ctx.fillStyle = '#181425';                       // corner nibbles
-  for (const [cx, cy] of [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]]) ctx.fillRect(cx, cy, 1, 1);
+  ctx.fillStyle = 'rgba(12,10,26,0.6)';               // soft drop shadow
+  roundRect(ctx, 1, 2.5, w, h, r); ctx.fill();
 
-  ctx.font = '7px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#181425';
-  ctx.fillText(label, w / 2, h / 2 + 3.5);
-  ctx.fillStyle = lit ? '#fee761' : '#c0cbdc';
-  ctx.fillText(label, w / 2, h / 2 + 2.5);
-  ctx.textAlign = 'left';
-
-  if (press > 0) {                                 // gleam sweeping across
-    ctx.save();
-    ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.55 * (1 - e);
-    ctx.fillStyle = '#fee761';
-    const sx = -w * 0.7 + e * w * 2.2;
-    ctx.beginPath();
-    ctx.moveTo(sx, h); ctx.lineTo(sx + h * 0.8, 0);
-    ctx.lineTo(sx + h * 0.8 + w * 0.22, 0); ctx.lineTo(sx + w * 0.22, h);
-    ctx.closePath(); ctx.fill();
-    ctx.restore();
+  const g = ctx.createLinearGradient(0, 0, 0, h);     // face
+  if (state.tone === 'accent') {
+    g.addColorStop(0, lit ? '#ffd166' : '#d99326');
+    g.addColorStop(1, lit ? '#e08b1d' : '#a4650f');
+  } else {
+    g.addColorStop(0, lit ? '#4e5a80' : '#333c5c');
+    g.addColorStop(1, lit ? '#2c3454' : '#1d2440');
   }
+  ctx.fillStyle = g;
+  roundRect(ctx, 0, 0, w, h, r); ctx.fill();
+
+  ctx.save();                                          // glossy top half
+  roundRect(ctx, 0, 0, w, h, r); ctx.clip();
+  const gl = ctx.createLinearGradient(0, 0, 0, h * 0.55);
+  gl.addColorStop(0, 'rgba(255,255,255,0.16)');
+  gl.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gl;
+  ctx.fillRect(0, 0, w, h * 0.55);
+  if (press > 0) {                                     // gleam sweep
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.5 * (1 - e);
+    ctx.fillStyle = '#fee761';
+    const gx = -w * 0.7 + e * w * 2.2;
+    ctx.beginPath();
+    ctx.moveTo(gx, h); ctx.lineTo(gx + h * 0.8, 0);
+    ctx.lineTo(gx + h * 0.8 + w * 0.24, 0); ctx.lineTo(gx + w * 0.24, h);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.lineWidth = 1;                                   // rim
+  ctx.strokeStyle = lit ? '#feae34' : '#12142a';
+  roundRect(ctx, 0.5, 0.5, w - 1, h - 1, r); ctx.stroke();
+
+  const fs = state.size || 7;
+  ctx.font = state.font || (fs + 'px monospace');
+  ctx.textAlign = 'center';
+  // Centre on the glyph box, not the em box - the display face and the
+  // 7px mono face sit very differently on the baseline.
+  const m = ctx.measureText(label);
+  const asc = m.actualBoundingBoxAscent || fs * 0.7;
+  const desc = m.actualBoundingBoxDescent || 0;
+  const by = Math.round(h / 2 + (asc - desc) / 2);
+  // dark text on gold wants a light emboss; light text wants a dark one
+  ctx.fillStyle = state.tone === 'accent' ? 'rgba(255,240,205,0.55)' : 'rgba(12,10,26,0.85)';
+  ctx.fillText(label, w / 2, by + 1);
+  ctx.fillStyle = state.tone === 'accent' ? '#2a1c06'
+                : lit ? '#fee761' : '#c0cbdc';
+  ctx.fillText(label, w / 2, by);
+  ctx.textAlign = 'left';
   ctx.restore();
 }
 
-export const BTN_PRESS = 0.3;
+// Hit test in unscaled space, so the squish never moves the target.
+export function inButton(b) {
+  return input.mouse.x >= b.x && input.mouse.x < b.x + b.w &&
+         input.mouse.y >= b.y && input.mouse.y < b.y + b.h;
+}
 
 export function drawHud(ctx) {
   const p = G.player;
@@ -146,12 +203,15 @@ export function drawHud(ctx) {
   // Hearts stay clear of the buttons; the stat line below them may use
   // the full width, giving a small stepped plate.
   const hearts = Math.ceil(p.maxHp / 2);
-  const pitch = 10;
+  const pitch = 8;
   const roomTop = Math.max(pitch + 4, bx - 4);
   const perRow = Math.max(1, Math.floor((roomTop - 3) / pitch));
-  const hRows = Math.ceil(hearts / perRow);
-  const heartsW = 3 + Math.min(hearts, perRow) * pitch;
-  const heartsH = 3 + hRows * pitch;
+  // Past a dozen hearts the row becomes a wall of pips - show a bar instead.
+  const asBar = hearts > 12 || hearts > perRow * 2;
+  const barFullW = Math.min(Math.max(46, perRow * 4), roomTop - 6);
+  const hRows = asBar ? 1 : Math.ceil(hearts / perRow);
+  const heartsW = asBar ? barFullW + 13 : 3 + Math.min(hearts, perRow) * pitch;
+  const heartsH = asBar ? 12 : 3 + hRows * pitch;
 
   const goldTxt = '' + p.gold, lvTxt = 'LV' + p.level;
   const goldW = ctx.measureText(goldTxt).width;
@@ -172,13 +232,36 @@ export function drawHud(ctx) {
 
   const wob = p.hurtWobble > 0 ? p.hurtWobble : 0;
   if (p.hurtWobble > 0) p.hurtWobble -= 1 / 60;
-  for (let i = 0; i < hearts; i++) {
-    const hp2 = p.hp - i * 2;
-    const name = hp2 >= 2 ? 'heart_full' : hp2 === 1 ? 'heart_half' : 'heart_empty';
-    const jitter = wob > 0 ? Math.round(Math.sin(G.time * 40 + i) * wob * 3) : 0;
-    // sprite has 2px of padding above the heart shape
-    drawAnim(ctx, name, 0, 1 + (i % perRow) * pitch - 2,
-             Math.floor(i / perRow) * pitch + jitter);
+  const jit = wob > 0 ? Math.round(Math.sin(G.time * 40) * wob * 3) : 0;
+  if (asBar) {
+    const frac = Math.max(0, p.hp / p.maxHp);
+    const bx0 = 10, by0 = 3 + jit, bw = barFullW, bhh = 6;
+    drawAnim(ctx, 'heart_s_full', 0, 1, by0 - 1);
+    ctx.fillStyle = '#12142a';
+    ctx.fillRect(bx0 - 1, by0 - 1, bw + 2, bhh + 2);
+    ctx.fillStyle = '#3a2030';
+    ctx.fillRect(bx0, by0, bw, bhh);
+    const fillW = Math.round(bw * frac);
+    const gr = ctx.createLinearGradient(0, by0, 0, by0 + bhh);
+    gr.addColorStop(0, frac > 0.35 ? '#ff6b6b' : '#ffae57');
+    gr.addColorStop(1, frac > 0.35 ? '#c42430' : '#e04a1c');
+    ctx.fillStyle = gr;
+    ctx.fillRect(bx0, by0, fillW, bhh);
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.fillRect(bx0, by0, fillW, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';               // notch every 5 hearts
+    for (let i = 10; i < p.maxHp; i += 10) {
+      ctx.fillRect(bx0 + Math.round(bw * (i / p.maxHp)), by0, 1, bhh);
+    }
+    drawText(ctx, p.hp + '/' + p.maxHp, bx0 + 3, by0 + bhh - 1, '#ffe9e0');
+  } else {
+    for (let i = 0; i < hearts; i++) {
+      const hp2 = p.hp - i * 2;
+      const name = hp2 >= 2 ? 'heart_s_full' : hp2 === 1 ? 'heart_s_half' : 'heart_s_empty';
+      const jitter = wob > 0 ? Math.round(Math.sin(G.time * 40 + i) * wob * 3) : 0;
+      drawAnim(ctx, name, 0, 2 + (i % perRow) * pitch,
+               3 + Math.floor(i / perRow) * pitch + jitter);
+    }
   }
 
   const base = heartsH + 10;                          // stat line baseline
@@ -197,11 +280,10 @@ export function drawHud(ctx) {
 
   // --- buttons on top --------------------------------------------------
   G.ui.hudButtons = [];
-  G.ui.btnPress = G.ui.btnPress || {};
   for (const b of btns) {
-    const hover = input.mouse.x >= b.x && input.mouse.x < b.x + b.w &&
-                  input.mouse.y >= b.y && input.mouse.y < b.y + b.h;
-    drawButton(ctx, b.x, b.y, b.w, b.h, b.label, hover, G.ui.btnPress[b.id] || 0);
+    const hover = inButton(b);
+    drawSquishButton(ctx, b.x, b.y, b.w, b.h, b.label,
+                     { hover, press: pressAmount('hud_' + b.id) });
     G.ui.hudButtons.push(b);
   }
 
@@ -260,16 +342,20 @@ function titleLayout(ctx, opts) {
     if (total <= availH || size <= 13) {
       const top = Math.max(4, Math.round((VH - total) * 0.42));
       ctx.font = menuSize + 'px "Jacquard 12"';
-      let arrow = 0;
-      for (const o of opts) {
-        arrow = Math.max(arrow, ctx.measureText(o).width / 2 + menuSize * 0.85);
-      }
+      let bw = 0;
+      for (const o of opts) bw = Math.max(bw, ctx.measureText(o).width);
+      bw = Math.min(VW - 16, Math.ceil(bw + menuSize * 1.9));
+      const bh = Math.max(11, Math.round(rowH * 0.84));
+      const menuTop = top + size + gapSub + subSize + gapMenu;
       return {
         titleSize: size, subSize, menuSize, rowH,
         titleY: top + size,
         subY: top + size + gapSub + subSize,
-        menuY: top + size + gapSub + subSize + gapMenu + menuSize,
-        arrow: Math.min(arrow, VW / 2 - 6),
+        btns: opts.map((o, i) => ({
+          label: o, w: bw, h: bh,
+          x: Math.round((VW - bw) / 2),
+          y: Math.round(menuTop + i * rowH),
+        })),
       };
     }
     size--;
@@ -283,15 +369,14 @@ export function updateTitle() {
   if (input.pressed.down) { st.sel = (st.sel + 1) % opts.length; sfx('menu'); }
   let activate = input.pressed.interact || input.pressed.attack;
   const L = titleLayout(G.ctx, opts);
-  opts.forEach((o, i) => {
-    const cy = L.menuY + i * L.rowH;
-    if (input.mouse.x > VW / 2 - L.arrow - 10 && input.mouse.x < VW / 2 + L.arrow + 10 &&
-        input.mouse.y > cy - L.menuSize && input.mouse.y < cy + L.rowH - L.menuSize) {
+  L.btns.forEach((b, i) => {
+    if (inButton(b)) {
       if (st.sel !== i) { st.sel = i; sfx('menu'); }
       if (input.mouse.clicked) activate = true;
     }
   });
   if (activate) {
+    pressKey('title_' + st.sel);
     sfx('menu');
     const o = opts[st.sel];
     if (o.startsWith('Music')) {
@@ -424,41 +509,59 @@ export function drawTitle(ctx) {
   ctx.fillStyle = '#8b9bb4';
   ctx.fillText('a tiny action rpg', VW / 2, L.subY);
 
-  ctx.font = L.menuSize + 'px "Jacquard 12"';
-  opts.forEach((o, i) => {
-    const on = st.sel === i;
-    const y = L.menuY + i * L.rowH;
-    ctx.fillStyle = '#181425';
-    ctx.fillText(o, VW / 2 + 1, y + 1);
-    ctx.fillStyle = on ? '#fee761' : '#8b9bb4';
-    ctx.fillText(o, VW / 2, y);
-    if (on) {
-      ctx.fillText('>', VW / 2 - L.arrow, y);
-      ctx.fillText('<', VW / 2 + L.arrow, y);
-    }
-  });
   ctx.textAlign = 'left';
+  L.btns.forEach((b, i) => {
+    drawSquishButton(ctx, b.x, b.y, b.w, b.h, b.label, {
+      selected: st.sel === i,
+      hover: inButton(b),
+      press: pressAmount('title_' + i),
+      font: L.menuSize + 'px "Jacquard 12"',
+      size: L.menuSize,
+      tone: st.sel === i ? 'accent' : null,
+    });
+  });
+}
+
+function pauseOptions() {
+  return ['Resume', G.muted ? 'Unmute' : 'Mute',
+          'Music: ' + (G.musicOn ? 'On' : 'Off'), 'Restart (new game)'];
+}
+
+function pauseLayout(opts) {
+  const bh = 15, gap = 4;
+  const pw = Math.min(146, VW - 12);
+  const ph = 28 + opts.length * (bh + gap) + 4;
+  const px = Math.round((VW - pw) / 2), py = Math.round((VH - ph) / 2);
+  const bw = pw - 22;
+  return {
+    px, py, pw, ph,
+    btns: opts.map((o, i) => ({
+      label: o, x: px + 11, y: py + 26 + i * (bh + gap), w: bw, h: bh,
+    })),
+  };
 }
 
 export function updatePause() {
   const st = G.ui.pause;
-  const opts = ['Resume', G.muted ? 'Unmute' : 'Mute', 'Restart (new game)'];
+  const opts = pauseOptions();
+  if (st.sel >= opts.length) st.sel = 0;
   if (input.pressed.up) { st.sel = (st.sel + opts.length - 1) % opts.length; sfx('menu'); }
   if (input.pressed.down) { st.sel = (st.sel + 1) % opts.length; sfx('menu'); }
   if (input.pressed.pause) return 'Resume';
   let activate = input.pressed.interact || input.pressed.attack;
-  const py = (VH - 80) / 2;
-  opts.forEach((o, i) => {
-    const cy = py + 36 + i * 12;
-    if (input.mouse.x > VW / 2 - 60 && input.mouse.x < VW / 2 + 60 &&
-        input.mouse.y > cy - 8 && input.mouse.y < cy + 4) {
+  const L = pauseLayout(opts);
+  L.btns.forEach((b, i) => {
+    if (inButton(b)) {
       if (st.sel !== i) { st.sel = i; sfx('menu'); }
       if (input.mouse.clicked) activate = true;
     }
   });
   if (activate) {
+    pressKey('pause_' + st.sel);
     sfx('menu');
-    return opts[st.sel];
+    const o = opts[st.sel];
+    if (o.startsWith('Music')) { setMusicEnabled(!G.musicOn); return null; }
+    return o;
   }
   return null;
 }
@@ -467,14 +570,17 @@ export function drawPause(ctx) {
   ctx.fillStyle = 'rgba(24,20,37,0.7)';
   ctx.fillRect(0, 0, VW, VH);
   const st = G.ui.pause;
-  const pw = Math.min(130, VW - 16);
-  const px = (VW - pw) / 2, py = (VH - 80) / 2;
-  drawPanel(ctx, px, py, pw, 78);
-  drawBigText(ctx, 'PAUSED', VW / 2, py + 18, '#feae34');
-  const opts = ['Resume', G.muted ? 'Unmute' : 'Mute', 'Restart (new game)'];
-  opts.forEach((o, i) => {
-    const on = st.sel === i;
-    drawTextC(ctx, (on ? '> ' : '') + o, VW / 2, py + 36 + i * 12, on ? '#fee761' : '#c0cbdc');
+  const opts = pauseOptions();
+  const L = pauseLayout(opts);
+  drawPanel(ctx, L.px, L.py, L.pw, L.ph);
+  drawBigText(ctx, 'PAUSED', VW / 2, L.py + 18, '#feae34');
+  L.btns.forEach((b, i) => {
+    drawSquishButton(ctx, b.x, b.y, b.w, b.h, b.label, {
+      selected: st.sel === i,
+      hover: inButton(b),
+      press: pressAmount('pause_' + i),
+      tone: st.sel === i ? 'accent' : null,
+    });
   });
 }
 
