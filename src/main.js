@@ -609,11 +609,13 @@ function drawWorld(ctx) {
     drawShadow(ctx, sx, sy, pr.type === 'sign' ? 4 : 6);
   }
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-    const ov = map.render[y][x].overlay;
+    const cell = map.render[y][x];
+    const ov = cell.overlay;
     if (!ov) continue;
-    if (ov.startsWith('tree')) drawShadow(ctx, x * TILE + 9 - cx, y * TILE + 15 - cy, 7, 3, 0.32);
-    else if (ov === 'bush') drawShadow(ctx, x * TILE + 8 - cx, y * TILE + 13 - cy, 6, 2.5, 0.30);
-    else if (ov === 'stone') drawShadow(ctx, x * TILE + 8 - cx, y * TILE + 14 - cy, 6, 2.5, 0.30);
+    const sx = x * TILE + cell.ox - cx, sy = y * TILE + cell.oy - cy;
+    if (ov.startsWith('tree')) drawShadow(ctx, sx + 9, sy + 15, 7, 3, 0.32);
+    else if (ov === 'bush') drawShadow(ctx, sx + 8, sy + 13, 6, 2.5, 0.30);
+    else if (ov === 'stone') drawShadow(ctx, sx + 8, sy + 14, 6, 2.5, 0.30);
   }
   for (const n of G.npcs) drawShadow(ctx, n.x + 8 - cx, n.y + 15 - cy, 5);
   for (const m of G.monsters) {
@@ -625,8 +627,10 @@ function drawWorld(ctx) {
   // depth-sorted drawables: tile overlays (trees etc), props, entities
   const drawables = [];
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-    const ov = map.render[y][x].overlay;
-    if (ov) drawables.push({ y: y * TILE + 15, f: () => drawAnim(ctx, ov, 0, x * TILE - cx, y * TILE - cy) });
+    const cell = map.render[y][x];
+    if (!cell.overlay) continue;
+    const sx = x * TILE + cell.ox - cx, sy = y * TILE + cell.oy - cy;
+    drawables.push({ y: y * TILE + cell.oy + 15, f: () => drawAnim(ctx, cell.overlay, 0, sx, sy) });
   }
   for (const pr of map.props) {
     const px = pr.x * TILE, py = pr.y * TILE;

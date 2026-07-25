@@ -432,7 +432,11 @@ export function buildMap(name) {
       } else {
         base = TILE_SPRITES[ch];
       }
-      render[y].push({ base, overlay, decal: decalFor(ch, x, y) });
+      // nudge scenery off the tile grid so stands of trees look planted,
+      // not tiled; collision stays on the tile itself
+      const ox = overlay ? Math.round(hash2(x, y, 17) * 5) - 2 : 0;
+      const oy = overlay ? Math.round(hash2(x, y, 19) * 4) - 2 : 0;
+      render[y].push({ base, overlay, ox, oy, decal: decalFor(ch, x, y) });
       solid[y].push(SOLID.has(ch));
     }
   }
