@@ -121,7 +121,7 @@ export function drawQuests(ctx) {
   ctx.save();
   ctx.translate(0, Math.round((1 - t) * -30));
   ctx.globalAlpha = t;
-  const w = 220, h = 156;
+  const w = Math.min(220, VW - 12), h = Math.min(156, VH - 34);
   const x = Math.round((VW - w) / 2), y = Math.round((VH - h - 12) / 2);
   drawPanel(ctx, x, y, w, h);
   drawHeading(ctx, 'Quest Log', x + 10, y + 15);

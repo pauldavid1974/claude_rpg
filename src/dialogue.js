@@ -22,8 +22,9 @@ export function say(name, pages, extra = {}) {
 
 function choiceRow(i) {
   // hit zones matching where drawDialogue puts the two choice lines
-  const x = Math.round((VW - 272) / 2), y = VH - 60;
-  return input.mouse.x > x + 144 && input.mouse.x < x + 240 &&
+  const w = Math.min(272, VW - 12);
+  const x = Math.round((VW - w) / 2), y = VH - 60;
+  return input.mouse.x > x + w - 130 && input.mouse.x < x + w - 8 &&
          input.mouse.y > y + 18 + i * 12 && input.mouse.y < y + 30 + i * 12;
 }
 
@@ -72,8 +73,8 @@ export function updateDialogue(dt) {
 
 export function drawDialogue(ctx) {
   if (!script) return;
-  const w = 272, h = 52;
-  const x = Math.round((VW - w) / 2), y = VH - 60;
+  const w = Math.min(272, VW - 12), h = 52;
+  const x = Math.round((VW - w) / 2), y = VH - h - 8;
   drawPanel(ctx, x, y, w, h);
   if (script.name) {
     ctx.font = '15px "Jacquard 12"';
@@ -97,8 +98,9 @@ export function drawDialogue(ctx) {
   const full = chars >= script.pages[page].length;
   if (full && choosing) {
     const c = script.choice;
-    drawText(ctx, (choiceSel === 0 ? '> ' : '  ') + c.yes, x + 150, y + 26, choiceSel === 0 ? '#fee761' : '#c0cbdc');
-    drawText(ctx, (choiceSel === 1 ? '> ' : '  ') + c.no, x + 150, y + 38, choiceSel === 1 ? '#fee761' : '#c0cbdc');
+    const cxp = x + w - 126;
+    drawText(ctx, (choiceSel === 0 ? '> ' : '  ') + c.yes, cxp, y + 26, choiceSel === 0 ? '#fee761' : '#c0cbdc');
+    drawText(ctx, (choiceSel === 1 ? '> ' : '  ') + c.no, cxp, y + 38, choiceSel === 1 ? '#fee761' : '#c0cbdc');
   } else if (full && Math.floor(G.time * 2.5) % 2) {
     drawText(ctx, 'v', x + w - 14, y + h - 8, '#feae34');
   }

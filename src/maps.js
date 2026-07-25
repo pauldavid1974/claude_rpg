@@ -1,12 +1,12 @@
 // World maps.  Grids are built programmatically: grass base + carved
 // features.  Chars: . , : ; grass family | p path | w water | t tree
-// r rock | f fence | W wall | U dungeon wall | V wood wall | R b roofs
+// r rock | W wall | U dungeon wall | V wood wall | R b roofs
 // F wood floor | S stone floor | D door.
 
 import { TILE } from './state.js';
 
-const GRASS = new Set(['.', ',', ':', ';', 't', 'r', 'f']);
-const SOLID = new Set(['t', 'r', 'f', 'w', 'W', 'U', 'V', 'R', 'b',
+const GRASS = new Set(['.', ',', ':', ';', 't', 'r']);
+const SOLID = new Set(['t', 'r', 'w', 'W', 'U', 'V', 'R', 'b',
                        '[', ']', '{', '}', '=', '_', 'O']);
 
 // Stable per-tile hash, for picking sprite variants and decals.
@@ -164,7 +164,6 @@ function town1() {
   vline(m, 18, 6, 8, 'p');
   hline(m, 8, 3, 25, 'p');
   hline(m, 8, 24, 25, 'p');
-  rect(m, 11, 11, 4, 3, 'f'); rect(m, 12, 12, 2, 1, '.');  // small pen
   fringe(m, 61);
   scatterGrass(m, 9);
   return {
@@ -245,7 +244,6 @@ function store() {
     props: [
       { type: 'barrel', x: 1, y: 1 }, { type: 'barrel', x: 2, y: 1 },
       { type: 'torch', x: 4, y: 1 }, { type: 'torch', x: 8, y: 1 },
-      { type: 'fence', x: 5, y: 3 }, { type: 'fence', x: 6, y: 3 }, { type: 'fence', x: 7, y: 3 },
     ],
     pickups: [],
   };
@@ -261,7 +259,6 @@ function smithy() {
     props: [
       { type: 'torch', x: 2, y: 1 }, { type: 'torch', x: 10, y: 1 },
       { type: 'barrel', x: 10, y: 6 },
-      { type: 'fence', x: 5, y: 3 }, { type: 'fence', x: 6, y: 3 }, { type: 'fence', x: 7, y: 3 },
     ],
     pickups: [],
   };
@@ -355,7 +352,7 @@ const TILE_SPRITES = {
   '[': 'roof_red_l', ']': 'roof_red_r', '=': 'roof_eave',
   '{': 'roof_blue_l', '}': 'roof_blue_r', '_': 'roof_eave_blue',
 };
-const OVERLAYS = { 'r': 'stone', 'f': 'fence' };
+const OVERLAYS = { 'r': 'stone' };
 const TREES = ['tree', 'tree', 'tree', 'tree_pine', 'tree_pine', 'tree_small', 'bush'];
 
 // Scatter decals over open ground so large areas stop reading as tiled.

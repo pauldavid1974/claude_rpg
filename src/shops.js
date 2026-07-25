@@ -103,7 +103,7 @@ function sell(slot) {
 }
 
 function layout(list) {
-  const w = 200;
+  const w = Math.min(200, VW - 12);
   const x = Math.round((VW - w) / 2), y = Math.round((VH - 168) / 2);
   const rows = list.map((_, i) => ({ x: x + 10, y: y + 44 + i * 14, w: w - 20 }));
   const tabs = [{ id: 'buy', x: x + 12, y: y + 28 }, { id: 'sell', x: x + 58, y: y + 28 }];

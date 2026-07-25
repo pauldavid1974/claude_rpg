@@ -762,7 +762,7 @@
    "h": 16,
    "fps": 8
   },
-  "fence": {
+  "gate_bars": {
    "sheet": "props",
    "row": 4,
    "frames": 1,

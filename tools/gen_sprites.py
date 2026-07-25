@@ -1410,25 +1410,24 @@ def build_props():
         ".....0oyYyo0....",
         "......0oyo0.....",
     ]
-    # upright picket fence: tall posts with two rails, so it reads as
-    # standing rather than planks lying on the grass
-    fence = F(
-        "................",
-        "................",
-        ".0T0........0T0.",
-        ".0t0........0t0.",
-        ".0t0........0t0.",
-        "00t00000000000t0",
-        "0dtdddddddddddt0",
-        "0Tttttttttttttt0",
-        "00t00000000000t0",
-        ".0t0........0t0.",
-        "00t00000000000t0",
-        "0dtdddddddddddt0",
-        "0Tttttttttttttt0",
-        "00t00000000000t0",
-        ".0T0........0T0.",
-        ".0e0........0e0.",
+    # iron portcullis for the crypt gate
+    gate_bars = F(
+        "0000000000000000",
+        "0444444444444440",
+        "0433333333333320",
+        "0400400400400400",
+        "0454054054054540",
+        "0434034034034340",
+        "0424024024024240",
+        "0434034034034340",
+        "0444444444444440",
+        "0434034034034340",
+        "0424024024024240",
+        "0434034034034340",
+        "0454054054054540",
+        "0424024024024240",
+        "0433333333333320",
+        "0000000000000000",
     )
     barrel = F(
         "................",
@@ -1453,7 +1452,7 @@ def build_props():
     s.add("chest_open", [chest_open])
     s.add("sign", [sign])
     s.add("torch", [torch(flame1), torch(flame2), torch(flame3)], 8)
-    s.add("fence", [fence])
+    s.add("gate_bars", [gate_bars])
     s.add("barrel", [barrel])
     return s
 

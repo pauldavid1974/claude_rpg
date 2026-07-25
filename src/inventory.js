@@ -102,7 +102,7 @@ export function updateInventory(dt) {
   if (input.pressed.interact) useSelected();
   if (input.pressed.attack) dropSelected();
   // mouse: hover/click cells; click outside the panels closes
-  const { mx, my, w, h, cells } = layout();
+  const { mx, my, totalW, totalH, cells } = layout();
   let onCell = false;
   for (let i = 0; i < cells.length; i++) {
     const c = cells[i];
@@ -114,25 +114,34 @@ export function updateInventory(dt) {
     }
   }
   if (input.mouse.clicked && !onCell &&
-      (input.mouse.x < mx || input.mouse.x > mx + w + 4 + 128 ||
-       input.mouse.y < my || input.mouse.y > my + h)) {
+      (input.mouse.x < mx || input.mouse.x > mx + totalW ||
+       input.mouse.y < my || input.mouse.y > my + totalH)) {
     G.mode = 'play'; sfx('menu');
   }
 }
 
 function layout() {
   const w = 168, h = 150;
-  const mx = Math.round((VW - 300) / 2), my = Math.round((VH - 158) / 2);
+  const dw = 128, gap = 4;
+  // side by side when there is room, otherwise the detail panel stacks
+  const stacked = VW < w + gap + dw + 12;
+  const dh = stacked ? 74 : h;
+  const totalW = stacked ? w : w + gap + dw;
+  const totalH = stacked ? h + gap + dh : h;
+  const mx = Math.round((VW - totalW) / 2);
+  const my = Math.round((VH - totalH - 14) / 2);
+  const dx = stacked ? mx : mx + w + gap;
+  const dy = stacked ? my + h + gap : my;
   const cells = [];
   for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
     cells.push({ x: mx + 10 + c * 24, y: my + 30 + r * 24 });
   }
-  return { mx, my, w, h, cells };
+  return { mx, my, w, h, dx, dy, dw, dh, totalW, totalH, cells };
 }
 
 export function drawInventory(ctx) {
   const st = G.ui.inv;
-  const { mx, my, w, h, cells } = layout();
+  const { mx, my, w, h, dx, dy, dw, dh, totalH, cells } = layout();
   const slide = Math.round((1 - st.t) * -30);
   ctx.save();
   ctx.translate(0, slide);
@@ -159,25 +168,24 @@ export function drawInventory(ctx) {
     }
   }
   // detail panel
-  const dx = mx + w + 4, dw = 128;
-  drawPanel(ctx, dx, my, dw, h);
+  drawPanel(ctx, dx, dy, dw, dh);
   const slot = p.inv[st.sel];
   const stats = statsLine();
   if (slot) {
     const def = ITEMS[slot.id];
-    drawText(ctx, def.name, dx + 8, my + 14, '#ffffff');
-    drawWrapped(ctx, def.desc || '', dx + 8, my + 26, dw - 16, '#c0cbdc');
+    drawText(ctx, def.name, dx + 8, dy + 14, '#ffffff');
+    drawWrapped(ctx, def.desc || '', dx + 8, dy + 26, dw - 16, '#c0cbdc');
     const hint = def.type === 'weapon' || def.type === 'armor'
       ? (p.weapon === slot.id || p.armor === slot.id ? 'E/click: unequip' : 'E/click: equip')
       : def.type === 'potion' ? 'E/click: drink' : '';
-    if (hint) drawText(ctx, hint, dx + 8, my + 62, '#8b9bb4');
-    if (def.type !== 'quest') drawText(ctx, 'Space: drop', dx + 8, my + 72, '#8b9bb4');
+    if (hint) drawText(ctx, hint, dx + 8, dy + dh - 22, '#8b9bb4');
+    if (def.type !== 'quest') drawText(ctx, 'Space: drop', dx + 8, dy + dh - 12, '#8b9bb4');
   } else {
-    drawText(ctx, 'empty', dx + 8, my + 14, '#5a6988');
+    drawText(ctx, 'empty', dx + 8, dy + 14, '#5a6988');
   }
-  drawText(ctx, 'LV ' + p.level + '  ATK ' + stats.atk + '  DEF ' + stats.def, dx + 8, my + h - 30, '#feae34');
-  drawText(ctx, 'HP ' + p.hp + '/' + p.maxHp, dx + 8, my + h - 18, '#f6757a');
-  drawTextC(ctx, 'I / Esc: close', VW / 2, my + h + 10, '#8b9bb4');
+  drawText(ctx, 'LV ' + p.level + '  ATK ' + stats.atk + '  DEF ' + stats.def, mx + 10, my + h - 8, '#feae34');
+  drawText(ctx, 'HP ' + p.hp + '/' + p.maxHp, mx + 108, my + h - 8, '#f6757a');
+  drawTextC(ctx, 'I / Esc: close', VW / 2, my + totalH + 10, '#8b9bb4');
   ctx.restore();
   ctx.globalAlpha = 1;
 }

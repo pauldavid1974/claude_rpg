@@ -623,7 +623,7 @@ function drawWorld(ctx) {
   for (const pr of map.props) {
     const sx = pr.x * TILE + 8 - cx, sy = pr.y * TILE + 15 - cy;
     if (sx < -24 || sy < -24 || sx > VW + 24 || sy > VH + 24) continue;
-    if (pr.type === 'torch' || pr.type === 'fence' || pr.type === 'gate') continue;
+    if (pr.type === 'torch' || pr.type === 'gate') continue;
     drawShadow(ctx, sx, sy, pr.type === 'sign' ? 4 : 6);
   }
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
@@ -658,8 +658,7 @@ function drawWorld(ctx) {
     else if (pr.type === 'sign') name = 'sign';
     else if (pr.type === 'torch') { name = 'torch'; fi = frameOf('torch', G.time + pr.x * 0.13); }
     else if (pr.type === 'barrel') name = 'barrel';
-    else if (pr.type === 'fence') name = 'fence';
-    else if (pr.type === 'gate') name = 'fence';
+    else if (pr.type === 'gate') name = 'gate_bars';
     if (name) drawables.push({ y: py + 14, f: () => drawAnim(ctx, name, fi, px - cx, py - cy) });
   }
   for (const pk of G.pickups) {

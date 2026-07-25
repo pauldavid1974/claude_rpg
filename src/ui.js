@@ -96,7 +96,7 @@ export function drawHud(ctx) {
     else {
       const a = Math.min(1, G.banner.t * 2);
       ctx.globalAlpha = a;
-      const w = G.banner.text.length * 5 + 20;
+      const w = Math.min(G.banner.text.length * 5 + 20, VW - 8);
       drawPanel(ctx, (VW - w) / 2, 6, w, 18);
       drawTextC(ctx, G.banner.text, VW / 2, 18, '#fee761');
       ctx.globalAlpha = 1;
@@ -328,8 +328,9 @@ export function drawPause(ctx) {
   ctx.fillStyle = 'rgba(24,20,37,0.7)';
   ctx.fillRect(0, 0, VW, VH);
   const st = G.ui.pause;
-  const px = (VW - 130) / 2, py = (VH - 80) / 2;
-  drawPanel(ctx, px, py, 130, 78);
+  const pw = Math.min(130, VW - 16);
+  const px = (VW - pw) / 2, py = (VH - 80) / 2;
+  drawPanel(ctx, px, py, pw, 78);
   drawBigText(ctx, 'PAUSED', VW / 2, py + 18, '#feae34');
   const opts = ['Resume', G.muted ? 'Unmute' : 'Mute', 'Restart (new game)'];
   opts.forEach((o, i) => {
