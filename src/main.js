@@ -19,7 +19,7 @@ import { updateDialogue, drawDialogue, talkTo, say } from './dialogue.js';
 import { updateShop, drawShop } from './shops.js';
 import {
   drawHud, drawTitle, updateTitle, drawPause, updatePause,
-  drawGameover, drawTransition, drawText,
+  drawGameover, drawTransition, drawText, BTN_PRESS,
 } from './ui.js';
 import { saveGame, loadGame, clearSave } from './save.js';
 import { ITEMS } from './items.js';
@@ -227,6 +227,7 @@ function loop(ts) {
   requestAnimationFrame(loop);
   const now = ts / 1000;
   let dt = Math.min(0.05, now - (last || now));
+  const dtReal = dt;
   last = now;
   G.time += dt;
 
@@ -275,6 +276,9 @@ function loop(ts) {
   }
 
   if (input.pressed.mute) { toggleMute(); saveGame(); }
+  for (const k in G.ui.btnPress || {}) {
+    if (G.ui.btnPress[k] > 0) G.ui.btnPress[k] = Math.max(0, G.ui.btnPress[k] - dtReal);
+  }
   if (G.mode !== 'play') G.ui.goal = null;   // menus/dialogue cancel mouse goals
 
   draw();
@@ -286,6 +290,8 @@ function hudButtonClick() {
   for (const b of G.ui.hudButtons || []) {
     if (input.mouse.x >= b.x && input.mouse.x < b.x + b.w &&
         input.mouse.y >= b.y && input.mouse.y < b.y + b.h) {
+      G.ui.btnPress = G.ui.btnPress || {};
+      G.ui.btnPress[b.id] = BTN_PRESS;
       if (b.id === 'inv') openInventory();
       else if (b.id === 'quest') openQuests();
       else { G.mode = 'pause'; G.ui.pause = { sel: 0 }; sfx('menu'); }

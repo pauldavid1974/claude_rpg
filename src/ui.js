@@ -62,50 +62,113 @@ export function drawPanel(ctx, x, y, w, h) {
 
 // --- HUD ---------------------------------------------------------------
 
+// Press feedback: a squash-then-overshoot bounce plus a gleam that
+// sweeps across the face. `e` runs 0 -> 1 over the press.
+function pressScale(e) {
+  if (e < 0.35) return 1 - 0.14 * (e / 0.35);
+  if (e < 0.7) return 0.86 + 0.22 * ((e - 0.35) / 0.35);
+  return 1.08 - 0.08 * ((e - 0.7) / 0.3);
+}
+
+function drawButton(ctx, x, y, w, h, label, hover, press) {
+  const e = press > 0 ? 1 - press / BTN_PRESS : 0;
+  const s = press > 0 ? pressScale(e) : (hover ? 1.04 : 1);
+  ctx.save();
+  ctx.translate(x + w / 2, y + h / 2);
+  ctx.scale(s, s);
+  ctx.translate(-w / 2, -h / 2);
+
+  const lit = hover || press > 0;
+  ctx.fillStyle = '#181425';                       // drop shadow
+  ctx.fillRect(1, 2, w, h);
+  const g = ctx.createLinearGradient(0, 0, 0, h);  // face
+  g.addColorStop(0, lit ? '#4a5578' : '#333c5c');
+  g.addColorStop(1, lit ? '#2b3350' : '#1e2540');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = lit ? '#8b9bb4' : '#5a6988';     // top bevel
+  ctx.fillRect(1, 1, w - 2, 1);
+  ctx.fillStyle = '#12142a';                       // bottom shade
+  ctx.fillRect(1, h - 2, w - 2, 1);
+  ctx.strokeStyle = lit ? '#feae34' : '#181425';   // border
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+  ctx.fillStyle = '#181425';                       // corner nibbles
+  for (const [cx, cy] of [[0, 0], [w - 1, 0], [0, h - 1], [w - 1, h - 1]]) ctx.fillRect(cx, cy, 1, 1);
+
+  ctx.font = '7px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#181425';
+  ctx.fillText(label, w / 2, h / 2 + 3.5);
+  ctx.fillStyle = lit ? '#fee761' : '#c0cbdc';
+  ctx.fillText(label, w / 2, h / 2 + 2.5);
+  ctx.textAlign = 'left';
+
+  if (press > 0) {                                 // gleam sweeping across
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, w, h); ctx.clip();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.55 * (1 - e);
+    ctx.fillStyle = '#fee761';
+    const sx = -w * 0.7 + e * w * 2.2;
+    ctx.beginPath();
+    ctx.moveTo(sx, h); ctx.lineTo(sx + h * 0.8, 0);
+    ctx.lineTo(sx + h * 0.8 + w * 0.22, 0); ctx.lineTo(sx + w * 0.22, h);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+export const BTN_PRESS = 0.3;
+
 export function drawHud(ctx) {
   const p = G.player;
-
-  // Buttons first: they own the top-right corner, and everything else
-  // lays out around whatever room they leave.
   const touch = document.body.classList.contains('touch');
   const narrow = VW < 250;
-  const bh = touch ? 20 : 13;
-  const pad = touch ? (narrow ? 5 : 8) : 4;
+  ctx.font = '7px monospace';
+
+  // --- measure the buttons first; they own the top-right --------------
+  const bh = touch ? 17 : 13;
   const labels = narrow
     ? [['inv', 'BAG'], ['quest', 'QST'], ['pause', 'MENU']]
     : [['inv', 'BAG'], ['quest', 'QUESTS'], ['pause', 'MENU']];
-  G.ui.hudButtons = [];
-  let bx = VW - 4;
+  const btns = [];
+  let bx = VW - 3;
   for (let i = labels.length - 1; i >= 0; i--) {
     const [id, label] = labels[i];
-    const w = label.length * 5 + pad * 2;
-    bx -= w + 4;
-    const hover = input.mouse.x >= bx && input.mouse.x < bx + w &&
-                  input.mouse.y >= 3 && input.mouse.y < 3 + bh;
-    ctx.fillStyle = hover ? '#3a4466' : 'rgba(38,43,68,0.8)';
-    ctx.fillRect(bx, 3, w, bh);
-    ctx.strokeStyle = '#181425'; ctx.lineWidth = 1;
-    ctx.strokeRect(bx + 0.5, 3.5, w - 1, bh - 1);
-    drawText(ctx, label, bx + pad, 3 + bh / 2 + 3, hover ? '#fee761' : '#8b9bb4');
-    G.ui.hudButtons.push({ id, x: bx, y: 3, w, h: bh });
+    const w = label.length * 5 + (touch ? 12 : 9);
+    bx -= w + 3;
+    btns.unshift({ id, label, x: bx, y: 3, w, h: bh });
   }
 
-  // Stats plate: beside the buttons when it fits, tucked under them when
-  // it doesn't, with hearts wrapping onto extra rows as max HP grows.
+  // --- stats block, tucked into the corner ----------------------------
+  // Hearts stay clear of the buttons; the stat line below them may use
+  // the full width, giving a small stepped plate.
   const hearts = Math.ceil(p.maxHp / 2);
-  const beside = bx - 6;
-  const under = beside < 70;
-  const plateY = under ? 3 + bh + 3 : 0;
-  const availW = under ? VW - 8 : beside;
-  const perRow = Math.max(1, Math.floor((availW - 6) / 11));
-  const heartRows = Math.ceil(hearts / perRow);
-  const plateW = Math.min(availW, Math.max(74, 8 + Math.min(hearts, perRow) * 11));
-  const plateH = 40 + (heartRows - 1) * 11;
-  ctx.fillStyle = 'rgba(12,10,26,0.45)';
-  ctx.fillRect(0, plateY, plateW, plateH);
-  ctx.fillStyle = 'rgba(12,10,26,0.25)';
-  ctx.fillRect(plateW, plateY, 4, plateH);
-  ctx.fillRect(0, plateY + plateH, plateW + 4, 3);
+  const pitch = 10;
+  const roomTop = Math.max(pitch + 4, bx - 4);
+  const perRow = Math.max(1, Math.floor((roomTop - 3) / pitch));
+  const hRows = Math.ceil(hearts / perRow);
+  const heartsW = 3 + Math.min(hearts, perRow) * pitch;
+  const heartsH = 3 + hRows * pitch;
+
+  const goldTxt = '' + p.gold, lvTxt = 'LV' + p.level;
+  const goldW = ctx.measureText(goldTxt).width;
+  const lvW = ctx.measureText(lvTxt).width;
+  const barW = 18;
+  let statsW = 11 + goldW + 5 + lvW + 4 + barW + 3;
+  const showBar = statsW <= VW - 6;
+  if (!showBar) statsW = 11 + goldW + 5 + lvW + 3;
+
+  ctx.fillStyle = 'rgba(10,8,22,0.74)';
+  ctx.fillRect(0, 0, heartsW, heartsH);
+  ctx.fillRect(0, heartsH, statsW, 14);
+  ctx.fillStyle = 'rgba(90,105,136,0.35)';           // lip along the edges
+  ctx.fillRect(heartsW, 0, 1, heartsH);
+  ctx.fillRect(statsW, heartsH, 1, 14);
+  ctx.fillRect(0, heartsH + 14, statsW + 1, 1);
+  ctx.fillRect(heartsW, heartsH - 1, Math.max(0, statsW - heartsW), 1);
 
   const wob = p.hurtWobble > 0 ? p.hurtWobble : 0;
   if (p.hurtWobble > 0) p.hurtWobble -= 1 / 60;
@@ -113,18 +176,34 @@ export function drawHud(ctx) {
     const hp2 = p.hp - i * 2;
     const name = hp2 >= 2 ? 'heart_full' : hp2 === 1 ? 'heart_half' : 'heart_empty';
     const jitter = wob > 0 ? Math.round(Math.sin(G.time * 40 + i) * wob * 3) : 0;
-    drawAnim(ctx, name, 0, 4 + (i % perRow) * 11,
-             plateY + 2 + Math.floor(i / perRow) * 11 + jitter);
+    // sprite has 2px of padding above the heart shape
+    drawAnim(ctx, name, 0, 1 + (i % perRow) * pitch - 2,
+             Math.floor(i / perRow) * pitch + jitter);
   }
-  const statY = plateY + 14 + (heartRows - 1) * 11;
-  drawAnim(ctx, 'coin', frameOf('coin', G.time), 2, statY);
-  drawText(ctx, '' + p.gold, 18, statY + 11, '#fee761');
-  drawText(ctx, 'LV' + p.level, 4, statY + 23, '#c0cbdc');
-  ctx.fillStyle = '#262b44';
-  ctx.fillRect(26, statY + 18, Math.min(40, plateW - 30), 4);
-  ctx.fillStyle = '#63c74d';
-  ctx.fillRect(26, statY + 18,
-    Math.round(Math.min(40, plateW - 30) * Math.min(1, p.xp / xpNeed(p.level))), 4);
+
+  const base = heartsH + 10;                          // stat line baseline
+  drawAnim(ctx, 'coin', frameOf('coin', G.time), -3, base - 11);
+  drawText(ctx, goldTxt, 11, base, '#fee761');
+  const lvX = 11 + goldW + 5;
+  drawText(ctx, lvTxt, lvX, base, '#c0cbdc');
+  if (showBar) {
+    const barX = lvX + lvW + 4;
+    ctx.fillStyle = '#181425';
+    ctx.fillRect(barX, base - 5, barW, 4);
+    ctx.fillStyle = '#63c74d';
+    ctx.fillRect(barX + 1, base - 4,
+      Math.round((barW - 2) * Math.min(1, p.xp / xpNeed(p.level))), 2);
+  }
+
+  // --- buttons on top --------------------------------------------------
+  G.ui.hudButtons = [];
+  G.ui.btnPress = G.ui.btnPress || {};
+  for (const b of btns) {
+    const hover = input.mouse.x >= b.x && input.mouse.x < b.x + b.w &&
+                  input.mouse.y >= b.y && input.mouse.y < b.y + b.h;
+    drawButton(ctx, b.x, b.y, b.w, b.h, b.label, hover, G.ui.btnPress[b.id] || 0);
+    G.ui.hudButtons.push(b);
+  }
 
   if (G.banner) {
     G.banner.t -= 1 / 60;
@@ -132,12 +211,12 @@ export function drawHud(ctx) {
     else {
       ctx.globalAlpha = Math.min(1, G.banner.t * 2);
       const w = Math.min(G.banner.text.length * 5 + 20, VW - 8);
-      drawPanel(ctx, (VW - w) / 2, plateY + (under ? 26 : 6) + bh, w, 18);
-      drawTextC(ctx, G.banner.text, VW / 2, plateY + (under ? 38 : 18) + bh, '#fee761');
+      drawPanel(ctx, (VW - w) / 2, heartsH + 20, w, 18);
+      drawTextC(ctx, G.banner.text, VW / 2, heartsH + 32, '#fee761');
       ctx.globalAlpha = 1;
     }
   }
-  if (G.muted) drawText(ctx, 'MUTED', 4, VH - 4, '#5a6988');
+  if (G.muted) drawText(ctx, 'MUTED', 3, VH - 3, '#5a6988');
 }
 
 // --- screens -----------------------------------------------------------
