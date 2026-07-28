@@ -2014,6 +2014,46 @@ def build_ui():
     s.add("heart_full", [heart_full])
     s.add("heart_half", [heart_half])
     s.add("heart_empty", [heart_empty])
+    # Overhead quest markers.  Drawn as real sprites rather than text so
+    # they read at any zoom: chunky gold glyph, hard dark keyline.
+    mark_new = F(
+        "................",
+        "......0000......",
+        ".....0YYYY0.....",
+        ".....0YyyY0.....",
+        ".....0YyyY0.....",
+        ".....0YyyY0.....",
+        ".....0YyyY0.....",
+        ".....0YyyY0.....",
+        "......0yy0......",
+        "......0000......",
+        "................",
+        "......0000......",
+        ".....0YyyY0.....",
+        ".....0YyyY0.....",
+        "......0000......",
+        "................",
+    )
+    mark_done = F(
+        "................",
+        ".....00000......",
+        "....0YYYYY0.....",
+        "....0Yy00Yy0....",
+        "....0YY00yY0....",
+        ".....000.0yY0...",
+        ".........0yY0...",
+        "......000yY00...",
+        "......0YyyY0....",
+        "......0YyY0.....",
+        "......0000......",
+        "................",
+        "......0000......",
+        ".....0YyyY0.....",
+        ".....0YyyY0.....",
+        "......0000......",
+    )
+    s.add("mark_new", [mark_new])
+    s.add("mark_done", [mark_done])
     s.add("heart_s_full", [heart_s_full])
     s.add("heart_s_half", [heart_s_half])
     s.add("heart_s_empty", [heart_s_empty])

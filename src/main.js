@@ -898,9 +898,7 @@ function drawWorld(ctx) {
       y: n.y + 15, f: () => {
         const fi = frameOf(n.sprite, G.time + n.homeX * 0.1);
         drawActor(ctx, n.sprite, fi, n.x - cx, n.y - cy);
-        // quest marker
-        const mark = questMarker(n);
-        if (mark) drawText(ctx, mark, n.x + 6 - cx, n.y - 3 - cy + Math.round(Math.sin(G.time * 3) * 1.5), '#fee761');
+        drawQuestMarker(ctx, n, cx, cy);
       },
     });
   }
@@ -959,12 +957,34 @@ function drawWorld(ctx) {
 import { QUESTS, canTurnIn } from './quests.js';
 function questMarker(n) {
   for (const [id, q] of Object.entries(QUESTS)) {
-    if (canTurnIn(id) && q.giver === n.name) return '?';
+    if (canTurnIn(id) && q.giver === n.name) return 'mark_done';
   }
-  if (n.id === 'elder' && (!G.quests.q_slimes || (G.quests.q_slimes?.state === 'done' && !G.quests.q_letter))) return '!';
-  if (n.id === 'lila' && !G.quests.q_bats) return '!';
-  if (n.id === 'pip' && !G.quests.q_gels) return '!';
+  if (n.id === 'elder' && (!G.quests.q_slimes || (G.quests.q_slimes?.state === 'done' && !G.quests.q_letter))) return 'mark_new';
+  if (n.id === 'lila' && !G.quests.q_bats) return 'mark_new';
+  if (n.id === 'pip' && !G.quests.q_gels) return 'mark_new';
   return null;
+}
+
+// Sits above the head, wherever the head happens to be - the sprite's own
+// height decides that, so it stays put if a character is ever redrawn at a
+// different size.
+function drawQuestMarker(ctx, n, cx, cy) {
+  const mark = questMarker(n);
+  if (!mark) return;
+  const a = anim(n.sprite);
+  const top = n.y + (16 - a.h);                       // top of the sprite
+  const bob = Math.round(Math.sin(G.time * 3 + n.homeX * 0.1) * 1.5);
+  const mx = Math.round(n.x + 8 - cx) - 8;
+  const my = Math.round(top - 17 - cy) + bob;
+  ctx.save();                                         // a little glow behind
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 0.16 + 0.06 * Math.sin(G.time * 4);
+  ctx.fillStyle = '#feae34';
+  ctx.beginPath();
+  ctx.ellipse(mx + 8, my + 8, 7, 8, 0, 0, 7);
+  ctx.fill();
+  ctx.restore();
+  drawAnim(ctx, mark, 0, mx, my);
 }
 
 // A wind-up paints the ground it is about to cover: an outline that fills

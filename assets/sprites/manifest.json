@@ -914,7 +914,7 @@
    "h": 16,
    "fps": 0
   },
-  "heart_s_full": {
+  "mark_new": {
    "sheet": "ui",
    "row": 3,
    "frames": 1,
@@ -922,7 +922,7 @@
    "h": 16,
    "fps": 0
   },
-  "heart_s_half": {
+  "mark_done": {
    "sheet": "ui",
    "row": 4,
    "frames": 1,
@@ -930,7 +930,7 @@
    "h": 16,
    "fps": 0
   },
-  "heart_s_empty": {
+  "heart_s_full": {
    "sheet": "ui",
    "row": 5,
    "frames": 1,
@@ -938,9 +938,25 @@
    "h": 16,
    "fps": 0
   },
-  "coin": {
+  "heart_s_half": {
    "sheet": "ui",
    "row": 6,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "heart_s_empty": {
+   "sheet": "ui",
+   "row": 7,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "coin": {
+   "sheet": "ui",
+   "row": 8,
    "frames": 4,
    "w": 16,
    "h": 16,
