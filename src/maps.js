@@ -177,9 +177,9 @@ function town1() {
       { x: 18, y: 5, w: 1, h: 1, to: 'elder_house', tx: 6, ty: 7 },
     ],
     npcs: [
-      { id: 'elder', sprite: 'npc_elder', name: 'Elder Rowan', x: 16, y: 7, wander: 0 },
-      { id: 'lila', sprite: 'npc_woman', name: 'Lila', x: 9, y: 10, wander: 1 },
-      { id: 'pip', sprite: 'npc_kid', name: 'Pip', x: 13, y: 14, wander: 1 },
+      { id: 'elder', sprite: 'npc_elder', name: 'Elder Rowan', x: 16, y: 7, wander: 0, night: [18, 6] },
+      { id: 'lila', sprite: 'npc_woman', name: 'Lila', x: 9, y: 10, wander: 1, night: [6, 9] },
+      { id: 'pip', sprite: 'npc_kid', name: 'Pip', x: 13, y: 12, wander: 1, night: [12, 10] },
     ],
     monsters: [],
     props: [
@@ -213,8 +213,8 @@ function town2() {
       { x: 19, y: 5, w: 1, h: 1, to: 'smithy', tx: 6, ty: 7 },
     ],
     npcs: [
-      { id: 'bram', sprite: 'npc_smith', name: 'Bram', x: 21, y: 7, wander: 0 },
-      { id: 'kid2', sprite: 'npc_kid', name: 'Nell', x: 10, y: 11, wander: 1 },
+      { id: 'bram', sprite: 'npc_smith', name: 'Bram', x: 21, y: 7, wander: 0, night: [19, 6] },
+      { id: 'kid2', sprite: 'npc_kid', name: 'Nell', x: 10, y: 11, wander: 1, night: [7, 6] },
     ],
     monsters: [],
     props: [
@@ -437,6 +437,9 @@ function dungeon3() {
   };
 }
 
+// region danger tiers
+const TIERS = { overworld: 0, dungeon: 1, dungeon2: 2, dungeon3: 3 };
+
 const BUILDERS = {
   overworld, town1, town2, store, smithy,
   elder_house: elderHouse, sage_house: sageHouse,
@@ -541,6 +544,9 @@ export function buildMap(name) {
   }
   return {
     name, w, h,
+    // How dangerous this region is meant to be: the road is the baseline,
+    // each crypt floor a step up.
+    tier: TIERS[name] || 0,
     music: def.music,
     grid, render, solid,
     exits: def.exits, npcDefs: def.npcs, monsterDefs: def.monsters,

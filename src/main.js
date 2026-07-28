@@ -16,7 +16,7 @@ import {
   CHARGE_MIN, CHARGE_FULL,
 } from './combat.js';
 import { routeTo, feetCenter } from './pathfind.js';
-import { drawLighting, drawGrade, drawShadow } from './lighting.js';
+import { drawLighting, drawGrade, drawShadow, isNight, dayPhase } from './lighting.js';
 import { updateParticles, drawParticles, drawFloats, sparkle, dust, addFloat } from './particles.js';
 import {
   openInventory, updateInventory, drawInventory, addItem, hasItem, removeItem,
@@ -1137,5 +1137,6 @@ window.EMBER = {  // debug/testing handle
   addItem, countItem, useQuick, useConsumable, poisonPlayer, SHOPS,
   skills, gainXp, playerStats, startAttack, moveset, attackBox,
   isSolidAt, routeTo, isBlockedAt: feetBlockedAt, questAim, settings, openSummary,
+  isNight, dayPhase,
 };
 boot();

@@ -200,13 +200,31 @@ export function talkTo(npc) {
     case 'bram':
       return say(npc.name, G.flags.bossDead
         ? ['The Bone King, felled! Ha! My swords sung in worthy hands.']
-        : ['Need steel? My cousin Edda runs the smithy behind me.',
-           'Cheap blades crack. Good blades cost. That is the whole of smithing.']);
+        : [gearRemark(), 'Cheap blades crack. Good blades cost.\nThat is the whole of smithing.']);
     case 'kid2':
       return say(npc.name, G.flags.bossDead
         ? ['You went INSIDE the crypt? And came back OUT?!']
-        : ['Mira talks to her herbs. I heard her thank one once.']);
+        : [levelRemark()]);
   }
+}
+
+// Townsfolk notice what you are carrying and how far you have come.
+function gearRemark() {
+  const p = G.player;
+  const lvl = weaponLevel(p.weapon);
+  if (!p.weapon) return 'Bare hands? Bold. Edda has steel out back.';
+  if (lvl >= 2) return 'That edge - Edda has been at it, has she? Good work.';
+  if (p.weapon === 'greatsword') return 'An Ember Blade. You do not see many of those.';
+  if (p.weapon === 'dagger') return 'Still on that little knife? Edda runs the smithy behind me.';
+  return 'Good iron. Keep the edge off the stone.';
+}
+
+function levelRemark() {
+  const lv = G.player.level;
+  if (lv >= 8) return 'Everyone says you are the one from the crypt road.\nAre you? Are you REALLY?';
+  if (lv >= 5) return 'You look tougher than last time. Did you get taller?';
+  if (lv >= 3) return 'Mira talks to her herbs. I heard her thank one once.';
+  return 'You are new. I can tell. Everyone new walks like that.';
 }
 
 // --- the forge ----------------------------------------------------------

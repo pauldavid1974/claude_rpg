@@ -4,7 +4,8 @@ import { G, TILE } from './state.js';
 import { isSolidAt } from './maps.js';
 import { damagePlayer, monsterShoot, moveset } from './combat.js';
 import { sfx } from './audio.js';
-import { dust, spawnPix } from './particles.js';
+import { dust, spawnPix, addFloat } from './particles.js';
+import { isNight } from './lighting.js';
 import { bonuses } from './skills.js';
 
 // --- collision helpers -------------------------------------------------
@@ -199,7 +200,7 @@ const MONSTER_STATS = {
   bat:      { hp: 5,  atk: 2, xp: 5,  speed: 62, poise: 1,  anim: 'bat_fly',       die: 'bat_die',      gold: [2, 5] },
   archer:   { hp: 9,  atk: 3, xp: 9,  speed: 40, poise: 2,  anim: 'archer_idle',   die: 'archer_die',   gold: [4, 9] },
   brute:    { hp: 26, atk: 5, xp: 18, speed: 26, poise: 6,  anim: 'brute_walk',    die: 'brute_die',    gold: [8, 16] },
-  boss:     { hp: 90, atk: 6, xp: 120, speed: 30, poise: 12, anim: 'boss_idle',    die: 'boss_die',     gold: [50, 80] },
+  boss:     { hp: 130, atk: 6, xp: 150, speed: 30, poise: 12, anim: 'boss_idle',   die: 'boss_die',     gold: [60, 95] },
 };
 
 // Melee attack profile: a readable wind-up, a short strike that actually
@@ -263,9 +264,11 @@ export function makeElite(m) {
 export function spawnMonster(type, tx, ty, elite = false) {
   const s = MONSTER_STATS[type];
   const size = type === 'boss' ? 32 : 16;
-  // New Game+ stacks on top of the difficulty setting
+  // Region tier, difficulty setting and New Game+ all stack.  The road is
+  // the baseline; each crypt floor is meaningfully meaner than the last.
+  const tier = (G.map && G.map.tier) || 0;
   const ng = 1 + (G.ngPlus || 0) * 0.35;
-  const tough = ((G.difficulty && G.difficulty.hp) || 1) * ng;
+  const tough = ((G.difficulty && G.difficulty.hp) || 1) * ng * (1 + tier * 0.22);
   const m = {
     type, ...structuredClone(s),
     hp: Math.max(1, Math.round(s.hp * tough)),
@@ -280,6 +283,12 @@ export function spawnMonster(type, tx, ty, elite = false) {
     staggerT: 0, armour: 0, elite: null,
     vx: 0, vy: 0,
   };
+  if (tier) {
+    m.atk = Math.ceil(m.atk * (1 + tier * 0.12));
+    m.xp = Math.round(m.xp * (1 + tier * 0.2));
+    m.gold = [Math.round(m.gold[0] * (1 + tier * 0.2)),
+              Math.round(m.gold[1] * (1 + tier * 0.25))];
+  }
   if (G.ngPlus) {
     m.atk = Math.ceil(m.atk * (1 + G.ngPlus * 0.18));
     m.xp = Math.round(m.xp * (1 + G.ngPlus * 0.3));
@@ -323,6 +332,14 @@ export function updateMonster(m, dt) {
   }
   if (m.poise < m.poiseMax) {
     m.poise = Math.min(m.poiseMax, m.poise + dt * m.poiseMax * 0.4);
+  }
+
+  // A boss phase break interrupts whatever it was doing, so this is
+  // checked before the attack state machine gets a say.
+  if (m.type === 'boss') {
+    const want = m.hp > m.maxHp * 0.66 ? 1 : m.hp > m.maxHp * 0.33 ? 2 : 3;
+    if (want !== (m.phase || 1)) enterBossPhase(m, want);
+    if (m.phaseT > 0) { m.phaseT -= dt; faceFromMotion(m); return; }
   }
 
   // --- telegraphed melee ----------------------------------------------
@@ -440,13 +457,10 @@ export function updateMonster(m, dt) {
       break;
 
     case 'boss': {
-      // Three phases, each announced by a break in the fight: the Bone
-      // King speeds up, calls his dead, then floods the floor with spikes.
-      const want = m.hp > m.maxHp * 0.66 ? 1 : m.hp > m.maxHp * 0.33 ? 2 : 3;
-      if (want !== (m.phase || 1)) enterBossPhase(m, want);
+      // Three phases: the Bone King speeds up, calls his dead, then
+      // floods the floor with spikes.  The break itself is handled above.
       const phase = m.phase || 1;
       const spd = m.speed * (1 + (phase - 1) * 0.35);
-      if (m.phaseT > 0) { m.phaseT -= dt; break; }   // roaring, untouchable-ish
       if (m.telegraphT > 0) {
         m.telegraphT -= dt;
         if (m.telegraphT <= 0) {
@@ -549,13 +563,27 @@ export function spawnNpc(def) {
   return {
     ...def,
     x: def.x * TILE, y: def.y * TILE,
+    dayX: def.x * TILE, dayY: def.y * TILE,
+    // after dark everyone drifts toward their own doorstep
+    nightX: (def.night ? def.night[0] : def.x) * TILE,
+    nightY: (def.night ? def.night[1] : def.y) * TILE,
     homeX: def.x * TILE, homeY: def.y * TILE,
-    t: Math.random() * 3, vx: 0, vy: 0,
+    t: Math.random() * 3, barkT: 4 + Math.random() * 10, vx: 0, vy: 0,
   };
 }
 
 export function updateNpc(n, dt) {
-  if (!n.wander) return;
+  // the station they are keeping right now
+  const night = isNight();
+  n.homeX = night ? n.nightX : n.dayX;
+  n.homeY = night ? n.nightY : n.dayY;
+  bark(n, dt);
+  if (!n.wander) {
+    // still walk back if the hour moved their post
+    const dx = n.homeX - n.x, dy = n.homeY - n.y;
+    if (Math.hypot(dx, dy) > 4) moveEntity(n, Math.sign(dx) * 18 * dt, Math.sign(dy) * 18 * dt);
+    return;
+  }
   n.t -= dt;
   if (n.t <= 0) {
     n.t = 2 + Math.random() * 2.5;
@@ -565,11 +593,41 @@ export function updateNpc(n, dt) {
       n.walkT = 0.7;
     }
   }
+  const far = Math.hypot(n.x - n.homeX, n.y - n.homeY);
+  if (far > 40 || (n.walkHome && far > 8)) {   // the post moved, or they strayed
+    n.walkHome = far > 8;
+    moveEntity(n, Math.sign(n.homeX - n.x) * 20 * dt, Math.sign(n.homeY - n.y) * 20 * dt);
+    return;
+  }
+  n.walkHome = false;
   if (n.walkT > 0) {
     n.walkT -= dt;
-    // stay near home
     if (Math.abs(n.x + n.vx * dt - n.homeX) < 40 && Math.abs(n.y + n.vy * dt - n.homeY) < 40) {
       moveEntity(n, n.vx * dt, n.vy * dt);
     }
   }
+}
+
+// Townsfolk mutter to themselves when you are close enough to hear.
+const BARKS = {
+  elder: ['Mind the road east.', 'Emberdale endures.', 'Hm. Hm.'],
+  lila:  ['Shoo! Off the porch!', 'Twelve eggs. Twelve!', 'Bless you, traveler.'],
+  pip:   ['Bet I could take one.', 'Do slimes have bones?', 'Are you a KNIGHT?'],
+  sage:  ['...seven, eight...', 'The stones remember.', 'Not now, not now.'],
+  bram:  ['Steel wants working.', 'Cheap blades crack.'],
+  kid2:  ['I saw a bat THIS big.', 'Nobody believes me.'],
+  smith2:['Mind the sparks.', 'Bring me shards.'],
+  shopkeep: ['Fresh stock today.', 'Coin first, friend.'],
+};
+const NIGHT_BARKS = ['Late to be out.', 'Cold tonight.', 'Sleep well, traveler.'];
+
+function bark(n, dt) {
+  if (G.mode !== 'play') return;
+  n.barkT -= dt;
+  if (n.barkT > 0) return;
+  n.barkT = 9 + Math.random() * 12;
+  const d = Math.hypot(n.x - G.player.x, n.y - G.player.y);
+  if (d > 58 || Math.random() < 0.35) return;
+  const pool = isNight() && Math.random() < 0.5 ? NIGHT_BARKS : (BARKS[n.id] || NIGHT_BARKS);
+  addFloat(pool[Math.floor(Math.random() * pool.length)], n.x + 8, n.y - 4, '#c0cbdc');
 }

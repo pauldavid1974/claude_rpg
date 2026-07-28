@@ -18,6 +18,55 @@ const MOOD = {
 };
 const DEFAULT_MOOD = MOOD.overworld;
 
+// The crypt floors share the entry hall's mood.
+MOOD.dungeon2 = MOOD.dungeon;
+MOOD.dungeon3 = MOOD.dungeon;
+
+// --- day and night -------------------------------------------------------
+// A slow cycle over the outdoor maps: bright noon, a long amber evening, a
+// blue night that never gets dark enough to lose the player.  Interiors and
+// the crypt ignore it.
+
+export const DAY_LENGTH = 360;    // seconds for a full turn
+
+// 0 = dawn, 0.25 = noon, 0.5 = dusk, 0.75 = midnight
+export function dayPhase() {
+  return ((G.time % DAY_LENGTH) / DAY_LENGTH + 0.12) % 1;
+}
+
+export function isNight() {
+  const p = dayPhase();
+  return p > 0.56 || p < 0.04;
+}
+
+// How much extra shade the sky is throwing, 0..1.
+function nightAmount() {
+  const p = dayPhase();
+  // ramp down into dusk, hold, ramp back up at dawn
+  if (p < 0.06) return 1 - p / 0.06;
+  if (p < 0.44) return 0;
+  if (p < 0.58) return (p - 0.44) / 0.14;
+  if (p < 0.94) return 1;
+  return 1 - (p - 0.94) / 0.06;
+}
+
+const OUTDOOR = { overworld: 1, town1: 1, town2: 1 };
+
+function moodFor(name) {
+  const base = MOOD[name] || DEFAULT_MOOD;
+  if (!OUTDOOR[name]) return base;
+  const n = nightAmount();
+  if (n <= 0.001) return base;
+  return {
+    ...base,
+    dark: `rgba(14,18,52,${(0.14 + 0.40 * n).toFixed(3)})`,
+    warm: base.warm + 0.35 * n,
+    vignette: base.vignette + 0.12 * n,
+    player: base.player + 40 * n,
+    grade: n > 0.5 ? `rgba(140,170,255,${(0.05 * n).toFixed(3)})` : base.grade,
+  };
+}
+
 let lm = null, lctx = null;
 
 function ensureLayer() {
@@ -61,7 +110,7 @@ function torchLights(cx, cy) {
 }
 
 export function drawLighting(ctx, cx, cy) {
-  const mood = MOOD[G.mapName] || DEFAULT_MOOD;
+  const mood = moodFor(G.mapName);
   const lights = torchLights(cx, cy);
   if (mood.player) {
     const p = G.player;
@@ -111,7 +160,7 @@ export function drawLighting(ctx, cx, cy) {
 
 // Screen-space finish: colour grade then vignette.
 export function drawGrade(ctx) {
-  const mood = MOOD[G.mapName] || DEFAULT_MOOD;
+  const mood = moodFor(G.mapName);
   if (mood.grade) {
     ctx.globalCompositeOperation = 'soft-light';
     ctx.fillStyle = mood.grade;
