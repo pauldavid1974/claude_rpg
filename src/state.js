@@ -16,6 +16,7 @@ export const G = {
   cam: { x: 0, y: 0 },
   shake: 0,
   hitstop: 0,
+  slowmo: 0,
   map: null,
   mapName: '',
   player: null,

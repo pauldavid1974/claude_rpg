@@ -102,6 +102,28 @@ function sell(slot) {
   sfx('buy');
 }
 
+// Weapons and armour show the swing against what is equipped, so a
+// purchase is never a guess.
+function compare(id) {
+  const def = ITEMS[id];
+  const p = G.player;
+  if (def.type !== 'weapon' && def.type !== 'armor') return null;
+  const stat = def.type === 'weapon' ? 'atk' : 'def';
+  const worn = def.type === 'weapon' ? p.weapon : p.armor;
+  if (worn === id) return { text: 'worn', better: false, worse: false };
+  const wornVal = worn ? (ITEMS[worn][stat] || 0) + upgradeBonus(worn, stat) : 0;
+  const d = (def[stat] || 0) + upgradeBonus(id, stat) - wornVal;
+  return {
+    text: (d > 0 ? '+' : '') + d + ' ' + stat.toUpperCase(),
+    better: d > 0, worse: d < 0,
+  };
+}
+
+function upgradeBonus(id, stat) {
+  if (stat !== 'atk') return 0;
+  return ((G.player.upgrades && G.player.upgrades[id]) || 0) * 2;
+}
+
 function layout(list) {
   const w = Math.min(200, VW - 12);
   const x = Math.round((VW - w) / 2), y = Math.round((VH - 168) / 2);
@@ -144,6 +166,11 @@ export function drawShop(ctx) {
     drawText(ctx, label, r.x + 16, r.y, selected ? '#ffffff' : '#c0cbdc');
     const afford = st.tab === 'sell' || G.player.gold >= price;
     drawText(ctx, price + 'g', r.x + r.w - 30, r.y, afford ? '#fee761' : '#e43b44');
+    // how it stacks up against what you are wearing
+    const cmp = compare(id);
+    if (cmp) {
+      drawText(ctx, cmp.text, r.x + r.w - 62, r.y, cmp.better ? '#63c74d' : cmp.worse ? '#e43b44' : '#8b9bb4');
+    }
   }
   const sel = list[st.sel];
   if (sel) {

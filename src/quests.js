@@ -1,6 +1,6 @@
 // Quest definitions, progress tracking, and the quest log UI.
 
-import { G, VW, VH } from './state.js';
+import { G, VW, VH, TILE } from './state.js';
 import { input } from './input.js';
 import { sfx } from './audio.js';
 import { drawPanel, drawText, drawTextC, drawHeading } from './ui.js';
@@ -9,43 +9,43 @@ export const QUESTS = {
   q_slimes: {
     name: 'Pest Control', giver: 'Elder Rowan', main: true,
     desc: 'Slay 5 slimes in the western fields.',
-    kill: 'slime', need: 5,
+    kill: 'slime', need: 5, at: { map: 'overworld', x: 10, y: 20 },
     reward: { gold: 30, items: ['potion'], xp: 10 },
   },
   q_letter: {
     name: 'A Sealed Letter', giver: 'Elder Rowan', main: true,
     desc: 'Deliver Rowan\'s letter to Sage Mira in Ashvale, east along the road.',
-    deliver: 'letter', need: 1,
+    deliver: 'letter', need: 1, at: { map: 'sage_house', x: 6, y: 5 },
     reward: { gold: 20, xp: 10 },
   },
   q_herbs: {
     name: 'Moonherb Ritual', giver: 'Sage Mira', main: true,
     desc: 'Gather 3 moonherbs from the eastern forest clearings.',
-    collect: 'herb', need: 3,
+    collect: 'herb', need: 3, at: { map: 'overworld', x: 34, y: 20 },
     reward: { gold: 35, items: ['potion'], xp: 15 },
   },
   q_bones: {
     name: 'Bones for a Key', giver: 'Sage Mira', main: true,
     desc: 'Bring Mira 3 old bones. Skeletons roam the north road and the crypt.',
-    collect: 'bone', need: 3,
+    collect: 'bone', need: 3, at: { map: 'overworld', x: 22, y: 5 },
     reward: { gold: 25, items: ['key'], xp: 15 },
   },
   q_boss: {
     name: 'The Bone King', giver: 'Sage Mira', main: true,
     desc: 'Unlock the crypt gate, slay the Bone King, and carry the Ember Amulet back to Elder Rowan.',
-    kill: 'boss', need: 1,
+    kill: 'boss', need: 1, at: { map: 'dungeon3', x: 14, y: 5 },
     reward: { gold: 200, items: ['potion_big'], xp: 60 },
   },
   q_bats: {
     name: 'Bat Trouble', giver: 'Lila',
     desc: 'Lila\'s chickens are terrified. Drive off 4 bats from the forest.',
-    kill: 'bat', need: 4,
+    kill: 'bat', need: 4, at: { map: 'overworld', x: 32, y: 24 },
     reward: { gold: 40, items: ['potion'], xp: 12 },
   },
   q_gels: {
     name: 'Wobbly Snacks', giver: 'Pip',
     desc: 'Pip swears slime gel tastes like candy. Bring 2 slime gels.',
-    collect: 'gel', need: 2,
+    collect: 'gel', need: 2, at: { map: 'overworld', x: 12, y: 22 },
     reward: { gold: 25, xp: 8 },
   },
 };
@@ -150,3 +150,81 @@ export function drawQuests(ctx) {
 
 import { drawWrapped } from './inventory.js';
 function drawDesc(ctx, text, x, y, w) { return drawWrapped(ctx, text, x, y, w, '#8b9bb4'); }
+
+// --- where the errand wants you next ------------------------------------
+// The compass needs a point on the floor you are standing on: either the
+// objective itself, or the doorway that leads toward it.
+
+const NEIGHBOURS = {
+  town1: ['overworld', 'store', 'elder_house'],
+  store: ['town1'],
+  elder_house: ['town1'],
+  overworld: ['town1', 'town2', 'dungeon'],
+  town2: ['overworld', 'smithy', 'sage_house'],
+  smithy: ['town2'],
+  sage_house: ['town2'],
+  dungeon: ['overworld', 'dungeon2'],
+  dungeon2: ['dungeon', 'dungeon3'],
+  dungeon3: ['dungeon2'],
+};
+
+const GIVER_MAP = {
+  'Elder Rowan': 'town1', 'Sage Mira': 'sage_house', 'Lila': 'town1', 'Pip': 'town1',
+};
+const GIVER_NPC = {
+  'Elder Rowan': 'elder', 'Sage Mira': 'sage', 'Lila': 'lila', 'Pip': 'pip',
+};
+
+// Breadth-first over the map graph; returns the next map to head for.
+function nextHop(from, to) {
+  if (from === to) return null;
+  const seen = { [from]: true };
+  const queue = (NEIGHBOURS[from] || []).map(n => [n, n]);
+  while (queue.length) {
+    const [node, first] = queue.shift();
+    if (node === to) return first;
+    if (seen[node]) continue;
+    seen[node] = true;
+    for (const n of NEIGHBOURS[node] || []) if (!seen[n]) queue.push([n, first]);
+  }
+  return null;
+}
+
+// The exit on this map that heads for `dest`, in world pixels.
+function exitToward(dest) {
+  const hop = nextHop(G.mapName, dest);
+  if (!hop) return null;
+  for (const e of G.map.exits) {
+    if (e.to !== hop) continue;
+    return { x: (e.x + e.w / 2) * TILE, y: (e.y + e.h / 2) * TILE, color: '#8b9bb4' };
+  }
+  return null;
+}
+
+export function questAim() {
+  // main-line quests first, then side quests, in definition order
+  const ids = Object.keys(QUESTS).filter(id => isActive(id));
+  ids.sort((a, b) => (QUESTS[b].main ? 1 : 0) - (QUESTS[a].main ? 1 : 0));
+  for (const id of ids) {
+    const q = QUESTS[id];
+    // ready to hand in: head for whoever gave it
+    if (canTurnIn(id)) {
+      const gmap = GIVER_MAP[q.giver];
+      if (!gmap) continue;
+      if (gmap === G.mapName) {
+        const n = G.npcs.find(n => n.id === GIVER_NPC[q.giver]);
+        if (n) return { x: n.x + 8, y: n.y + 8, color: '#63c74d' };
+      }
+      const e = exitToward(gmap);
+      if (e) return { ...e, color: '#63c74d' };
+      continue;
+    }
+    if (!q.at) continue;
+    if (q.at.map === G.mapName) {
+      return { x: q.at.x * TILE + 8, y: q.at.y * TILE + 8, color: '#fee761' };
+    }
+    const e = exitToward(q.at.map);
+    if (e) return e;
+  }
+  return null;
+}

@@ -1,6 +1,6 @@
 // HUD, panels, title/pause/gameover screens, banner, screen transition.
 
-import { G, VW, VH } from './state.js';
+import { G, VW, VH, TILE } from './state.js';
 import { drawAnim, anim, frameOf, sheetImage } from './assets.js';
 import { input } from './input.js';
 import { sfx } from './audio.js';
@@ -9,6 +9,7 @@ import { DODGE } from './entities.js';
 import { quickSlots, countItem, USE_CD } from './inventory.js';
 import { ITEMS } from './items.js';
 import { duckMusic } from './audio.js';
+import { questAim } from './quests.js';
 
 export function drawText(ctx, text, x, y, color = '#ffffff') {
   ctx.font = '7px monospace';
@@ -319,6 +320,7 @@ export function drawHud(ctx) {
     });
     G.ui.hudButtons.push(rb);
     drawQuickBar(ctx, p, touch);
+    drawMinimap(ctx, rh + 10);
   }
 
   drawStatusPips(ctx, p);
@@ -398,6 +400,109 @@ function drawStatusPips(ctx, p) {
     ctx.globalAlpha = 1;
     y -= 12;
   }
+}
+
+// --- minimap -------------------------------------------------------------
+// A corner plan of the floor: walls, exits, what is hunting you, and where
+// your errand is.  Rebuilt only when the map changes.
+
+let miniCanvas = null, miniFor = '';
+
+function miniPlan() {
+  const map = G.map;
+  if (miniFor === G.mapName && miniCanvas) return miniCanvas;
+  miniFor = G.mapName;
+  miniCanvas = document.createElement('canvas');
+  miniCanvas.width = map.w;
+  miniCanvas.height = map.h;
+  const c = miniCanvas.getContext('2d');
+  const img = c.createImageData(map.w, map.h);
+  for (let y = 0; y < map.h; y++) {
+    for (let x = 0; x < map.w; x++) {
+      const solid = map.solid[y][x];
+      const i = (y * map.w + x) * 4;
+      img.data[i] = solid ? 24 : 96;
+      img.data[i + 1] = solid ? 22 : 108;
+      img.data[i + 2] = solid ? 42 : 146;
+      img.data[i + 3] = solid ? 200 : 225;
+    }
+  }
+  c.putImageData(img, 0, 0);
+  for (const e of map.exits) {                 // doors and stairs pick out gold
+    c.fillStyle = '#fee761';
+    c.fillRect(e.x, e.y, e.w, e.h);
+  }
+  return miniCanvas;
+}
+
+export function drawMinimap(ctx, reserveBottom) {
+  if (!G.minimapOn || !G.map || VW < 210) return;
+  const map = G.map;
+  const maxW = Math.min(58, Math.round(VW * 0.22));
+  const maxH = Math.min(46, Math.round(VH * 0.26));
+  const s = Math.min(maxW / map.w, maxH / map.h);
+  const w = Math.round(map.w * s), h = Math.round(map.h * s);
+  const x = VW - w - 4, y = VH - h - reserveBottom;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(10,8,22,0.72)';
+  roundRect(ctx, x - 2, y - 2, w + 4, h + 4, 3); ctx.fill();
+  ctx.imageSmoothingEnabled = false;
+  ctx.globalAlpha = 0.9;
+  ctx.drawImage(miniPlan(), 0, 0, map.w, map.h, x, y, w, h);
+  ctx.globalAlpha = 1;
+
+  const at = (wx, wy) => [x + (wx / TILE) * s, y + (wy / TILE) * s];
+  for (const m of G.monsters) {
+    const [mx, my] = at(m.x + m.size / 2, m.y + m.size / 2);
+    ctx.fillStyle = m.type === 'boss' ? '#b55088' : m.elite ? m.eliteColor : '#e43b44';
+    ctx.fillRect(Math.round(mx) - 1, Math.round(my) - 1, m.type === 'boss' ? 3 : 2, m.type === 'boss' ? 3 : 2);
+  }
+  for (const n of G.npcs) {
+    const [nx, ny] = at(n.x + 8, n.y + 8);
+    ctx.fillStyle = '#2ce8f5';
+    ctx.fillRect(Math.round(nx), Math.round(ny), 1, 1);
+  }
+  const [px, py] = at(G.player.x + 8, G.player.y + 8);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(Math.round(px) - 1, Math.round(py) - 1, 3, 3);
+  ctx.fillStyle = '#181425';
+  ctx.fillRect(Math.round(px), Math.round(py), 1, 1);
+
+  ctx.strokeStyle = 'rgba(90,105,136,0.6)';
+  ctx.lineWidth = 1;
+  roundRect(ctx, x - 1.5, y - 1.5, w + 3, h + 3, 3); ctx.stroke();
+  ctx.restore();
+  return { x, y, w, h };
+}
+
+// --- quest compass -------------------------------------------------------
+// A chevron orbiting the player, pointing at whatever the current errand
+// wants next - the target on this floor, or the way out toward it.
+
+export function drawCompass(ctx, cx, cy) {
+  const aim = questAim();
+  if (!aim) return;
+  const p = G.player;
+  const px = p.x + 8 - cx, py = p.y + 10 - cy;
+  const dx = aim.x - (p.x + 8), dy = aim.y - (p.y + 10);
+  const d = Math.hypot(dx, dy);
+  if (d < 28) return;                       // close enough; stop nagging
+  const a = Math.atan2(dy, dx);
+  const r = 22 + Math.sin(G.time * 3) * 1.5;
+  ctx.save();
+  ctx.translate(Math.round(px + Math.cos(a) * r), Math.round(py + Math.sin(a) * r));
+  ctx.rotate(a);
+  ctx.globalAlpha = 0.75;
+  ctx.fillStyle = '#181425';
+  ctx.beginPath();
+  ctx.moveTo(4, 0); ctx.lineTo(-3, -3.5); ctx.lineTo(-1, 0); ctx.lineTo(-3, 3.5);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = aim.color || '#fee761';
+  ctx.beginPath();
+  ctx.moveTo(3, 0); ctx.lineTo(-2.5, -2.5); ctx.lineTo(-0.5, 0); ctx.lineTo(-2.5, 2.5);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
 }
 
 // --- danger --------------------------------------------------------------
@@ -671,7 +776,7 @@ export function drawTitle(ctx) {
 }
 
 function pauseOptions() {
-  return ['Resume', G.muted ? 'Unmute' : 'Mute',
+  return ['Resume', 'Settings', G.muted ? 'Unmute' : 'Mute',
           'Music: ' + (G.musicOn ? 'On' : 'Off'), 'Restart (new game)'];
 }
 

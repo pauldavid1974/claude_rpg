@@ -3,7 +3,7 @@
 import { G, VW, VH, TILE, setView, resetRun } from './state.js';
 import { loadAssets, drawAnim, drawAnimFlash, frameOf } from './assets.js';
 import { initInput, input, endFrame } from './input.js';
-import { initAudio, music, sfx, toggleMute, setMuted } from './audio.js';
+import { initAudio, music, sfx, toggleMute, setMuted, setCombatMusic } from './audio.js';
 import { buildMap, outsideCell, isSolidAt } from './maps.js';
 import {
   createPlayer, updatePlayerMovement, updateMonster, updateNpc,
@@ -22,15 +22,16 @@ import {
   openInventory, updateInventory, drawInventory, addItem, hasItem, removeItem,
   useQuick, useConsumable, countItem, QUICK_SLOTS,
 } from './inventory.js';
-import { openQuests, updateQuests, drawQuests } from './quests.js';
+import { openQuests, updateQuests, drawQuests, questAim } from './quests.js';
 import { openSkills, updateSkills, drawSkills, refreshDerived, respec, RESPEC_COST } from './skills.js';
+import { openSettings, updateSettings, drawSettings, loadSettings, settings } from './settings.js';
 import * as skills from './skills.js';
 import { updateDialogue, drawDialogue, talkTo, say, dialogueState } from './dialogue.js';
 import { updateShop, drawShop, SHOPS } from './shops.js';
 import {
   drawHud, drawTitle, updateTitle, drawPause, updatePause,
   drawGameover, drawTransition, drawText, pressKey, tickPresses,
-  updateDanger, drawDanger,
+  updateDanger, drawDanger, drawMinimap, drawCompass,
 } from './ui.js';
 import { saveGame, loadGame, clearSave } from './save.js';
 import { ITEMS } from './items.js';
@@ -50,6 +51,7 @@ G.ctx.imageSmoothingEnabled = false;
 // matter the screen shape: never wider/taller than MAX (which is what
 // made phones feel like watching from orbit), never tighter than MIN.
 const TOTAL_NOTES = 4;   // crypt records hidden across the three floors
+const SLOWMO_TIME = 1.0;
 
 const MAX_VIEW_W = 340, MAX_VIEW_H = 240;
 const MIN_VIEW_W = 150, MIN_VIEW_H = 110;
@@ -81,6 +83,7 @@ async function boot() {
     if (G.muted) setMuted(true);
     music(G.mode === 'title' ? 'town' : G.map ? G.map.music : 'town');
   });
+  loadSettings();
   const save = loadGame();
   G.ui.title = { sel: 0, hasSave: !!save };
   requestAnimationFrame(loop);
@@ -272,6 +275,10 @@ function loop(ts) {
   if (G.hitstop > 0) {
     G.hitstop -= dt;
     dt = 0;
+  } else if (G.slowmo > 0) {
+    // the killing blow on a boss: the world crawls for a beat
+    G.slowmo -= dtReal;
+    dt *= 0.25 + 0.55 * Math.max(0, 1 - G.slowmo / SLOWMO_TIME);
   }
 
   switch (G.mode) {
@@ -286,10 +293,12 @@ function loop(ts) {
     case 'inventory': updateInventory(dt); break;
     case 'quests': updateQuests(dt); break;
     case 'skills': updateSkills(dt); break;
+    case 'settings': updateSettings(dt); break;
     case 'shop': updateShop(dt); break;
     case 'pause': {
       const act = updatePause();
       if (act === 'Resume') { G.mode = 'play'; sfx('menu'); }
+      else if (act === 'Settings') openSettings();
       else if (act === 'Mute' || act === 'Unmute') { toggleMute(); saveGame(); }
       else if (act === 'Restart (new game)') newGame();
       break;
@@ -565,13 +574,14 @@ function updatePlay(dt) {
     if (Math.abs(p.kby) < 4) p.kby = 0;
   }
 
-  // footsteps
+  // footsteps: the ground under your boots decides how they sound
   if (p.moving && p.stepT <= 0) {
     p.stepT = 0.24;
-    sfx('step');
+    sfx(surfaceStep(p), 0.13);
     dust(p.x + 8, p.y + 15);
   }
 
+  updateAggro(dt);
   for (const m of G.monsters) updateMonster(m, dt);
   for (const n of G.npcs) updateNpc(n, dt);
   updateCombat(dt);
@@ -648,9 +658,50 @@ function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 function camTarget() {
   const p = G.player;
   const mw = G.map.w * TILE, mh = G.map.h * TILE;
-  const tx = mw >= VW ? clamp(p.x + 8 - VW / 2, 0, mw - VW) : -(VW - mw) / 2;
-  const ty = mh >= VH ? clamp(p.y + 8 - VH / 2, 0, mh - VH) : -(VH - mh) / 2;
+  // Look a little the way you are heading, and in a fight sit between the
+  // player and whatever is closest, so both stay comfortably on screen.
+  let fx = p.x + 8, fy = p.y + 8;
+  const lead = Math.min(VW, VH) * 0.10;
+  if (p.moving || p.dodgeT > 0) {
+    fx += (p.dir === 'left' ? -lead : p.dir === 'right' ? lead : 0);
+    fy += (p.dir === 'up' ? -lead : p.dir === 'down' ? lead : 0);
+  }
+  const foe = G.ui.nearFoe;
+  if (foe && G.monsters.includes(foe)) {
+    const w = 0.28;
+    fx += ((foe.x + foe.size / 2) - (p.x + 8)) * w;
+    fy += ((foe.y + foe.size / 2) - (p.y + 8)) * w;
+  }
+  const tx = mw >= VW ? clamp(fx - VW / 2, 0, mw - VW) : -(VW - mw) / 2;
+  const ty = mh >= VH ? clamp(fy - VH / 2, 0, mh - VH) : -(VH - mh) / 2;
   return [tx, ty];
+}
+
+// The ground under the player, for footstep flavour.
+function surfaceStep(p) {
+  const tx = Math.floor((p.x + 8) / TILE), ty = Math.floor((p.y + 13) / TILE);
+  const row = G.map.grid[ty];
+  const ch = row ? row[tx] : '.';
+  if (ch === 'S' || ch === 'W' || ch === 'U' || ch === 'p') return 'step_stone';
+  if (ch === 'F' || ch === 'D' || ch === 'V') return 'step_wood';
+  if (ch === 'w') return 'step_water';
+  return 'step_grass';
+}
+
+// Who is currently interested in you, and are we in a fight at all?
+function updateAggro(dt) {
+  const p = G.player;
+  let best = null, bestD = 1e9;
+  for (const m of G.monsters) {
+    const d = Math.hypot(m.x + m.size / 2 - (p.x + 8), m.y + m.size / 2 - (p.y + 8));
+    if (d < bestD) { bestD = d; best = m; }
+  }
+  const range = best && best.type === 'boss' ? 190 : 96;
+  const engaged = !!best && bestD < range;
+  G.ui.nearFoe = engaged ? best : null;
+  // a short tail so the music does not flicker as things wander in and out
+  G.ui.combatT = engaged ? 2.2 : Math.max(0, (G.ui.combatT || 0) - dt);
+  setCombatMusic(G.ui.combatT > 0);
 }
 
 // --- draw ---------------------------------------------------------------
@@ -670,7 +721,7 @@ function draw() {
   if (!G.map) return;
 
   ctx.save();
-  if (G.shake > 0) {
+  if (G.shake > 0 && G.shakeOn !== false) {
     ctx.translate(
       Math.round((Math.random() - 0.5) * G.shake),
       Math.round((Math.random() - 0.5) * G.shake));
@@ -692,6 +743,7 @@ function draw() {
     case 'inventory': drawInventory(ctx); break;
     case 'quests': drawQuests(ctx); break;
     case 'skills': drawSkills(ctx); break;
+    case 'settings': drawSettings(ctx); break;
     case 'shop': drawShop(ctx); break;
     case 'pause': drawPause(ctx); break;
     case 'gameover': drawGameover(ctx, G.ui.gameoverT); break;
@@ -805,6 +857,8 @@ function drawWorld(ctx) {
 
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.f();
+
+  if (G.mode === 'play' || G.mode === 'dialogue') drawCompass(ctx, cx, cy);
 
   // click-to-move destination marker
   const goal = G.ui.goal;
@@ -979,6 +1033,27 @@ function drawMonster(ctx, m, cx, cy) {
                    Math.round(dy - 3 + Math.sin(a) * 2), 1, 1);
     }
   }
+  // Ordinary enemies show a bar once you have hurt them, and it fades if
+  // you leave them alone.
+  if (m.type !== 'boss' && m.hp < m.maxHp) {
+    m.barT = 2.2;
+  } else if (m.barT > 0) {
+    m.barT -= 1 / 60;
+  }
+  if (m.type !== 'boss' && (m.barT > 0 || m.elite)) {
+    const w = Math.max(10, Math.round(m.size * 0.8));
+    const bx = Math.round(m.x + (m.size - w) / 2 - cx), by = Math.round(m.y - 4 - cy);
+    ctx.globalAlpha = m.elite ? 1 : Math.min(1, m.barT * 2);
+    ctx.fillStyle = '#12142a';
+    ctx.fillRect(bx - 1, by - 1, w + 2, 4);
+    ctx.fillStyle = m.elite ? m.eliteColor : '#e43b44';
+    ctx.fillRect(bx, by, Math.round(w * Math.max(0, m.hp / m.maxHp)), 2);
+    if (m.poiseMax) {                        // guard, under the health
+      ctx.fillStyle = m.staggerT > 0 ? '#fee761' : '#5a6988';
+      ctx.fillRect(bx, by + 2, Math.round(w * Math.max(0, m.poise / m.poiseMax)), 1);
+    }
+    ctx.globalAlpha = 1;
+  }
   // boss hp bar, with the phase thresholds marked on it
   if (m.type === 'boss') {
     const bx = Math.round(m.x - 4 - cx), by = Math.round(m.y - 6 - cy);
@@ -1005,7 +1080,7 @@ function drawMonster(ctx, m, cx, cy) {
   // elite name floats above once you are close enough to care
   if (m.elite && Math.hypot(m.x - G.player.x, m.y - G.player.y) < 70) {
     drawText(ctx, m.eliteName, Math.round(m.x + m.size / 2 - cx) -
-             m.eliteName.length * 2, Math.round(m.y - 7 - cy), m.eliteColor);
+             m.eliteName.length * 2, Math.round(m.y - 6 - cy), m.eliteColor);
   }
 }
 
@@ -1013,6 +1088,6 @@ window.EMBER = {  // debug/testing handle
   G, changeMap, dialogueState, spawnMonster, startDodge, hitMonster,
   addItem, countItem, useQuick, useConsumable, poisonPlayer, SHOPS,
   skills, gainXp, playerStats, startAttack, moveset, attackBox,
-  isSolidAt, routeTo, isBlockedAt: feetBlockedAt,
+  isSolidAt, routeTo, isBlockedAt: feetBlockedAt, questAim, settings,
 };
 boot();

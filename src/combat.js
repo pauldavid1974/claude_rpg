@@ -261,6 +261,8 @@ export function killMonster(m) {
   gainXp(m.xp);
   if (m.type === 'boss') {
     G.flags.bossDead = true;
+    G.slowmo = 1.0;                 // let the last hit land in slow motion
+    G.shake = 9;
     sfx('boss');
   }
   onKill(m.type);
@@ -283,7 +285,8 @@ export function gainXp(n) {
 export function damagePlayer(atk, fromX, fromY) {
   const p = G.player;
   if (p.iframes > 0 || G.mode !== 'play') return;
-  const dmg = Math.max(1, atk - playerStats().def);
+  const scale = (G.difficulty && G.difficulty.taken) || 1;
+  const dmg = Math.max(1, Math.round((atk - playerStats().def) * scale));
   p.hp -= dmg;
   p.iframes = 1.0;
   p.hurtWobble = 0.6;

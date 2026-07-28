@@ -4,8 +4,11 @@
 import { G } from './state.js';
 
 let ac = null;
-let master = null;
+let out = null;          // final bus, cut by mute
+let master = null;       // effects bus
 let musicGain = null;
+let musicVol = 0.8;
+let sfxVol = 0.8;
 let musicTimer = null;
 let currentTrack = null;
 let duck = 1;
@@ -15,17 +18,32 @@ try { G.musicOn = localStorage.getItem('emberdale_music') !== '0'; } catch (e) {
 export function initAudio() {
   if (ac) return;
   ac = new (window.AudioContext || window.webkitAudioContext)();
+  out = ac.createGain();
+  out.gain.value = G.muted ? 0 : 1;
+  out.connect(ac.destination);
   master = ac.createGain();
-  master.gain.value = 0.5;
-  master.connect(ac.destination);
+  master.gain.value = 0.5 * sfxVol;
+  master.connect(out);
   musicGain = ac.createGain();
-  musicGain.gain.value = (G.musicOn ? 0.42 : 0) * duck;
-  musicGain.connect(master);
+  musicGain.gain.value = musicLevel();
+  musicGain.connect(out);
+}
+
+function musicLevel() { return (G.musicOn ? 0.42 : 0) * duck * musicVol; }
+
+export function setMusicVolume(v) {
+  musicVol = Math.max(0, Math.min(1, v));
+  if (musicGain) musicGain.gain.value = musicLevel();
+}
+
+export function setSfxVolume(v) {
+  sfxVol = Math.max(0, Math.min(1, v));
+  if (master) master.gain.value = 0.5 * sfxVol;
 }
 
 export function setMusicEnabled(on) {
   G.musicOn = on;
-  if (musicGain) musicGain.gain.value = (on ? 0.42 : 0) * duck;
+  if (musicGain) musicGain.gain.value = musicLevel();
   try { localStorage.setItem('emberdale_music', on ? '1' : '0'); } catch (e) { /* ignore */ }
 }
 
@@ -34,19 +52,26 @@ export function setMusicEnabled(on) {
 export function duckMusic(amount) {
   if (amount === duck) return;
   duck = amount;
-  if (musicGain) musicGain.gain.value = (G.musicOn ? 0.42 : 0) * duck;
+  if (musicGain) musicGain.gain.value = musicLevel();
 }
 
 export function setMuted(m) {
   G.muted = m;
-  if (master) master.gain.value = m ? 0 : 0.5;
+  if (out) out.gain.value = m ? 0 : 1;
 }
 
 export function toggleMute() { setMuted(!G.muted); }
 
 // --- tiny helpers ------------------------------------------------------
 
+// Every effect gets a small random detune, so the hundredth sword swing
+// does not sound exactly like the first.  Music is left alone.
+let detune = 1;
+
 function osc(type, freq, t0, dur, vol, dest, slideTo = null) {
+  const d = dest === master ? detune : 1;
+  freq *= d;
+  if (slideTo) slideTo *= d;
   const o = ac.createOscillator();
   const g = ac.createGain();
   o.type = type;
@@ -74,7 +99,9 @@ function noise(t0, dur, vol, dest, freq = 0) {
   let node = s;
   if (freq) {
     const f = ac.createBiquadFilter();
-    f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = 1.2;
+    f.type = 'bandpass';
+    f.frequency.value = freq * (dest === master ? detune : 1);
+    f.Q.value = 1.2;
     s.connect(f); node = f;
   }
   node.connect(g).connect(dest);
@@ -98,6 +125,10 @@ const SFX = {
   quest:  (t) => [67, 71, 74, 79].forEach((n, i) => osc('triangle', mid(n), t + i * 0.11, 0.22, 0.22, master)),
   menu:   (t) => osc('square', mid(81), t, 0.04, 0.08, master),
   step:   (t) => noise(t, 0.04, 0.07, master, 1400),
+  step_grass: (t) => noise(t, 0.05, 0.055, master, 1100),
+  step_stone: (t) => { noise(t, 0.03, 0.09, master, 2600); osc('square', 190, t, 0.03, 0.03, master); },
+  step_wood:  (t) => { noise(t, 0.035, 0.06, master, 700); osc('triangle', 150, t, 0.05, 0.05, master, 95); },
+  step_water: (t) => noise(t, 0.09, 0.08, master, 420),
   door:   (t) => { noise(t, 0.2, 0.15, master, 300); osc('triangle', 90, t, 0.2, 0.15, master, 60); },
   heal:   (t) => osc('triangle', mid(72), t, 0.25, 0.2, master, mid(84)),
   boss:   (t) => { osc('sawtooth', 70, t, 0.7, 0.3, master, 45); noise(t, 0.5, 0.2, master, 200); },
@@ -115,9 +146,11 @@ const SFX = {
   telegraph:(t) => osc('sawtooth', 240, t, 0.18, 0.07, master, 380),
 };
 
-export function sfx(name) {
-  if (!ac || G.muted) return;
+export function sfx(name, spread = 0.07) {
+  if (!ac || G.muted || !SFX[name]) return;
+  detune = 1 + (Math.random() * 2 - 1) * spread;
   SFX[name](ac.currentTime);
+  detune = 1;
 }
 
 // --- music -------------------------------------------------------------
@@ -170,18 +203,82 @@ const TRACKS = {
 };
 
 const DRUMS = {
-  kick:  (t) => osc('sine', 130, t, 0.12, 0.5, musicGain, 40),
-  snare: (t) => noise(t, 0.09, 0.25, musicGain, 1800),
-  hat:   (t) => noise(t, 0.03, 0.10, musicGain, 6000),
+  kick:  (t, dest) => osc('sine', 130, t, 0.12, 0.5, dest || musicGain, 40),
+  snare: (t, dest) => noise(t, 0.09, 0.25, dest || musicGain, 1800),
+  hat:   (t, dest) => noise(t, 0.03, 0.10, dest || musicGain, 6000),
 };
 
 let nextBarTime = 0;
+
+// --- adaptive layer ------------------------------------------------------
+// A driving bass-and-drum bed that fades in on top of whatever is playing
+// the moment something notices you, and fades back out when it stops.
+
+const COMBAT_LAYER = {
+  bpm: 150,
+  voices: [
+    ['sawtooth', 0.09, [
+      [40,1],[0,1],[40,1],[47,1],[40,1],[0,1],[45,1],[43,1],
+      [40,1],[0,1],[40,1],[47,1],[38,1],[45,1],[36,1],[43,1],
+    ]],
+  ],
+  drums: [[0, 'kick'], [1, 'hat'], [1.5, 'kick'], [2, 'snare'], [3, 'hat'], [3.5, 'hat']],
+};
+
+let layerGain = null;
+let layerNext = 0;
+let layerOn = false;
+
+function ensureLayer() {
+  if (layerGain || !ac) return;
+  layerGain = ac.createGain();
+  layerGain.gain.value = 0;
+  layerGain.connect(musicGain);
+  layerNext = ac.currentTime + 0.05;
+}
+
+export function setCombatMusic(on) {
+  if (on === layerOn) return;
+  layerOn = on;
+  ensureLayer();
+  if (!layerGain) return;
+  const t = ac.currentTime;
+  layerGain.gain.cancelScheduledValues(t);
+  layerGain.gain.setValueAtTime(layerGain.gain.value, t);
+  layerGain.gain.linearRampToValueAtTime(on ? 1 : 0, t + (on ? 0.5 : 1.4));
+}
+
+function scheduleLayer() {
+  if (!layerGain) return;
+  const spb = 60 / COMBAT_LAYER.bpm;
+  if (layerNext < ac.currentTime) layerNext = ac.currentTime + 0.05;
+  while (layerNext < ac.currentTime + 0.6) {
+    const t0 = layerNext;
+    let barBeats = 0;
+    for (const [wave, vol, pat] of COMBAT_LAYER.voices) {
+      let bt = 0;
+      for (const [note, beats] of pat) {
+        if (note) osc(wave, mid(note), t0 + bt * spb, beats * spb * 0.9, vol, layerGain);
+        bt += beats;
+      }
+      barBeats = Math.max(barBeats, bt);
+    }
+    const total = barBeats || 4;
+    for (let b = 0; b < total; b += 4) {
+      for (const [beat, drum] of COMBAT_LAYER.drums) {
+        if (b + beat < total) DRUMS[drum](t0 + (b + beat) * spb, layerGain);
+      }
+    }
+    layerNext += total * spb;
+  }
+}
 
 export function music(name) {
   if (currentTrack === name) return;
   currentTrack = name;
   if (musicTimer) { clearInterval(musicTimer); musicTimer = null; }
   if (!ac || !name) return;
+  ensureLayer();
   nextBarTime = ac.currentTime + 0.05;
   const schedule = () => {
     const tr = TRACKS[name];
@@ -205,6 +302,7 @@ export function music(name) {
       }
       nextBarTime += totalBeats * spb;
     }
+    if (layerOn || (layerGain && layerGain.gain.value > 0.001)) scheduleLayer();
   };
   schedule();
   musicTimer = setInterval(schedule, 250);

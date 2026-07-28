@@ -263,9 +263,12 @@ export function makeElite(m) {
 export function spawnMonster(type, tx, ty, elite = false) {
   const s = MONSTER_STATS[type];
   const size = type === 'boss' ? 32 : 16;
+  const tough = (G.difficulty && G.difficulty.hp) || 1;
   const m = {
     type, ...structuredClone(s),
-    maxHp: s.hp, poiseMax: s.poise,
+    hp: Math.max(1, Math.round(s.hp * tough)),
+    maxHp: Math.max(1, Math.round(s.hp * tough)),
+    poiseMax: s.poise,
     x: tx * TILE, y: ty * TILE, size,
     homeX: tx * TILE, homeY: ty * TILE,
     state: 'idle', t: Math.random() * 2, flip: false,
