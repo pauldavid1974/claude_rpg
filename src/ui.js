@@ -50,6 +50,7 @@ export function drawBigText(ctx, text, cx, y, color = '#ffffff') {
 export function drawPanel(ctx, x, y, w, h) {
   const a = anim('panel');
   const img = sheetImage('panel');
+  if (!a || !img) return;
   const C = 16;
   const draw = (sx, sy, sw, sh, dx, dy, dw, dh) => {
     ctx.drawImage(img, sx, sy + a.row * 48, sw, sh, Math.round(dx), Math.round(dy), dw, dh);

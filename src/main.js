@@ -63,10 +63,14 @@ const MIN_VIEW_W = 150, MIN_VIEW_H = 110;
 
 function resize() {
   const dpr = window.devicePixelRatio || 1;
-  const dw = innerWidth * dpr, dh = innerHeight * dpr;
+  // An embedder that has not sized its frame yet reports 0, which used to
+  // hand the canvas a width of zero and leave it that way for good.
+  const dw = Math.max(MIN_VIEW_W, Math.round((innerWidth || 0) * dpr));
+  const dh = Math.max(MIN_VIEW_H, Math.round((innerHeight || 0) * dpr));
   let z = Math.max(1, Math.ceil(Math.max(dw / MAX_VIEW_W, dh / MAX_VIEW_H)));
   z = Math.max(1, Math.min(z, Math.floor(dw / MIN_VIEW_W), Math.floor(dh / MIN_VIEW_H)));
-  const vw = Math.ceil(dw / z), vh = Math.ceil(dh / z);
+  const vw = Math.max(MIN_VIEW_W, Math.ceil(dw / z));
+  const vh = Math.max(MIN_VIEW_H, Math.ceil(dh / z));
   setView(vw, vh);
   G.zoom = z;
   canvas.width = vw * z;
@@ -78,6 +82,14 @@ function resize() {
   canvas.style.top = Math.min(0, (innerHeight - cssH) / 2) + 'px';
 }
 addEventListener('resize', resize);
+// Some embedders size the frame without firing a window resize.
+if (window.ResizeObserver) {
+  let last = '';
+  new ResizeObserver(() => {
+    const k = innerWidth + 'x' + innerHeight;
+    if (k !== last) { last = k; resize(); }
+  }).observe(document.documentElement);
+}
 resize();
 
 // A blank canvas tells nobody anything.  If boot fails - a sheet that will
@@ -400,9 +412,16 @@ function loop(ts) {
   updateDanger(dtReal);
   if (G.mode !== 'play') G.ui.goal = null;   // menus/dialogue cancel mouse goals
 
-  draw();
+  try {
+    draw();
+  } catch (err) {
+    fatal(err);
+    drawFailed = true;
+  }
   endFrame();
 }
+
+let drawFailed = false;
 
 // HUD buttons (bag/quests/menu) let the game be played mouse-only.
 function hudButtonClick() {
@@ -794,6 +813,7 @@ function updateAggro(dt) {
 // --- draw ---------------------------------------------------------------
 
 function draw() {
+  if (drawFailed) return;                 // the message is already on screen
   const ctx = G.ctx;
   ctx.setTransform(G.zoom, 0, 0, G.zoom, 0, 0);
   ctx.imageSmoothingEnabled = false;
