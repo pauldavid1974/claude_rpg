@@ -1,7 +1,9 @@
 // Boot, game loop, world update/draw, map changes, interactions.
 
 import { G, VW, VH, TILE, setView, resetRun } from './state.js';
-import { loadAssets, drawAnim, drawAnimFlash, frameOf } from './assets.js';
+import {
+  loadAssets, drawAnim, drawAnimFlash, drawActor, drawActorFlash, frameOf, anim,
+} from './assets.js';
 import { initInput, input, endFrame, pollGamepad } from './input.js';
 import { initAudio, music, sfx, toggleMute, setMuted, setCombatMusic } from './audio.js';
 import { buildMap, outsideCell, isSolidAt } from './maps.js';
@@ -841,10 +843,14 @@ function drawWorld(ctx) {
     else if (ov === 'stone') drawShadow(ctx, sx + 8, sy + 14, 6, 2.5, 0.30);
   }
   // wind-up markers sit on the ground, under everything that stands on it
-  for (const m of G.monsters) drawTelegraph(ctx, m, cx, cy);
+  for (const m of G.monsters) {
+    if (m.atkPhase === 'none') continue;
+    drawTelegraph(ctx, m, cx, cy);
+  }
 
   for (const n of G.npcs) drawShadow(ctx, n.x + 8 - cx, n.y + 15 - cy, 5);
   for (const m of G.monsters) {
+    if (m.x < cx - 48 || m.x > cx + VW + 48 || m.y < cy - 64 || m.y > cy + VH + 48) continue;
     if (m.type === 'bat') { drawShadow(ctx, m.x + 8 - cx, m.y + 20 - cy, 4, 1.6, 0.20); continue; }
     drawShadow(ctx, m.x + m.size / 2 - cx, m.y + m.size - 2 - cy, m.size * 0.32);
   }
@@ -891,7 +897,7 @@ function drawWorld(ctx) {
     drawables.push({
       y: n.y + 15, f: () => {
         const fi = frameOf(n.sprite, G.time + n.homeX * 0.1);
-        drawAnim(ctx, n.sprite, fi, n.x - cx, n.y - cy);
+        drawActor(ctx, n.sprite, fi, n.x - cx, n.y - cy);
         // quest marker
         const mark = questMarker(n);
         if (mark) drawText(ctx, mark, n.x + 6 - cx, n.y - 3 - cy + Math.round(Math.sin(G.time * 3) * 1.5), '#fee761');
@@ -899,6 +905,8 @@ function drawWorld(ctx) {
     });
   }
   for (const m of G.monsters) {
+    // anything well off screen costs nothing to skip
+    if (m.x < cx - 48 || m.x > cx + VW + 48 || m.y < cy - 64 || m.y > cy + VH + 48) continue;
     drawables.push({ y: m.y + m.size - 1, f: () => drawMonster(ctx, m, cx, cy) });
   }
   drawables.push({ y: G.player.y + 15, f: () => drawPlayer(ctx, cx, cy) });
@@ -1007,16 +1015,18 @@ function drawPlayer(ctx, cx, cy) {
   // the roll: quarter-turn tumble, so the pixels stay exact
   if (p.dodgeT > 0) {
     const k = 1 - p.dodgeT / DODGE.time;
+    // spin about the sprite's own centre, whatever size it is
+    const a = anim('player_walk_' + p.dir);
     ctx.save();
-    ctx.translate(Math.round(p.x - cx) + 8, Math.round(p.y - cy) + 8);
+    ctx.translate(Math.round(p.x - cx) + 8, Math.round(p.y - cy) + 16 - a.h / 2);
     ctx.rotate(Math.floor(k * 5) % 4 * Math.PI / 2);
-    ctx.translate(-8, -8);
+    ctx.translate(-a.w / 2, -a.h / 2);
     drawAnim(ctx, 'player_walk_' + p.dir, 1, 0, 0);
     ctx.restore();
     return;
   }
   if (p.iframes > 0 && Math.floor(G.time * 14) % 2 && G.mode === 'play') {
-    drawAnimFlash(ctx, 'player_hurt', 0, p.x - cx, p.y - cy, '#ffffff');
+    drawActorFlash(ctx, 'player_hurt', 0, p.x - cx, p.y - cy, '#ffffff');
     return;
   }
   let name, fi = 0;
@@ -1027,7 +1037,7 @@ function drawPlayer(ctx, cx, cy) {
     name = 'player_walk_' + p.dir;
     fi = p.moving ? Math.floor(p.animT * 9) % 4 : 0;
   }
-  drawAnim(ctx, name, fi, p.x - cx, p.y - cy);
+  drawActor(ctx, name, fi, p.x - cx, p.y - cy);
 }
 
 function drawMonster(ctx, m, cx, cy) {
@@ -1065,13 +1075,13 @@ function drawMonster(ctx, m, cx, cy) {
   }
   const dx = m.x + ox - cx, dy = m.y + oy - cy;
   if (m.hurtT > 0 && Math.floor(G.time * 20) % 2) {
-    drawAnimFlash(ctx, name, fi, dx, dy, '#ffffff', m.flip);
+    drawActorFlash(ctx, name, fi, dx, dy, '#ffffff', m.flip);
   } else if (m.staggerT > 0 && Math.floor(G.time * 16) % 2) {
-    drawAnimFlash(ctx, name, fi, dx, dy, '#fee761', m.flip);
+    drawActorFlash(ctx, name, fi, dx, dy, '#fee761', m.flip);
   } else if ((m.telegraphT > 0 || m.atkPhase === 'wind') && Math.floor(G.time * 12) % 2) {
-    drawAnimFlash(ctx, name, fi, dx, dy, '#ff0044', m.flip);
+    drawActorFlash(ctx, name, fi, dx, dy, '#ff0044', m.flip);
   } else {
-    drawAnim(ctx, name, fi, dx, dy, m.flip);
+    drawActor(ctx, name, fi, dx, dy, m.flip);
   }
   if (m.staggerT > 0) {                     // stars over a broken guard
     for (let i = 0; i < 3; i++) {

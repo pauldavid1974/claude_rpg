@@ -28,6 +28,24 @@ export function frameOf(name, t) {
   return a.frames > 1 ? Math.floor(t * a.fps) % a.frames : 0;
 }
 
+// Actors taller than a tile are drawn centred on their 16px footprint with
+// their feet on its bottom edge, so a 24x32 hero stands exactly where a
+// 16x16 one did.
+export function actorOffset(name) {
+  const a = anim(name);
+  return [(16 - a.w) / 2, 16 - a.h];
+}
+
+export function drawActor(ctx, name, fi, x, y, flip = false) {
+  const [ox, oy] = actorOffset(name);
+  drawAnim(ctx, name, fi, x + ox, y + oy, flip);
+}
+
+export function drawActorFlash(ctx, name, fi, x, y, color, flip = false) {
+  const [ox, oy] = actorOffset(name);
+  drawAnimFlash(ctx, name, fi, x + ox, y + oy, color, flip);
+}
+
 export function drawAnim(ctx, name, fi, x, y, flip = false) {
   const a = anim(name);
   const img = images[a.sheet];

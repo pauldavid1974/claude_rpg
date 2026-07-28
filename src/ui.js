@@ -531,6 +531,8 @@ export function updateDanger(dt) {
   duckMusic(D.level === 2 ? 0.45 : 1);
 }
 
+let dangerGrad = null, dangerKey = '';
+
 export function drawDanger(ctx) {
   const D = G.ui.danger;
   if (!D || !D.level || !Number.isFinite(D.pulse)) return;
@@ -544,12 +546,17 @@ export function drawDanger(ctx) {
   }
   const base = D.level === 2 ? 0.40 : 0.16;   // ...so the red still reads
   const a = base + D.pulse * (D.level === 2 ? 0.34 : 0.20);
-  const g = ctx.createRadialGradient(
-    VW / 2, VH / 2, Math.min(VW, VH) * (0.30 - D.pulse * 0.07),
-    VW / 2, VH / 2, Math.max(VW, VH) * 0.66);
-  g.addColorStop(0, 'rgba(228,59,68,0)');
-  g.addColorStop(1, `rgba(190,22,34,${a})`);
-  ctx.fillStyle = g;
+  // the gradient only changes when the pulse steps, so cache it
+  const key = VW + 'x' + VH + ':' + a.toFixed(2) + ':' + Math.round(D.pulse * 12);
+  if (dangerKey !== key) {
+    dangerKey = key;
+    dangerGrad = ctx.createRadialGradient(
+      VW / 2, VH / 2, Math.min(VW, VH) * (0.30 - D.pulse * 0.07),
+      VW / 2, VH / 2, Math.max(VW, VH) * 0.66);
+    dangerGrad.addColorStop(0, 'rgba(228,59,68,0)');
+    dangerGrad.addColorStop(1, `rgba(190,22,34,${a})`);
+  }
+  ctx.fillStyle = dangerGrad;
   ctx.fillRect(0, 0, VW, VH);
 }
 

@@ -2059,6 +2059,283 @@ def build_panel():
 # main
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# 24x32 humanoids
+# ---------------------------------------------------------------------------
+# The 16x16 people had about six pixels of face to work with, which is not
+# enough to read expression, gear or facing at a glance.  Everyone who walks
+# on two legs is now built from one parameterised model at 24x32: three times
+# the pixels, the same palette, and every frame generated rather than hand
+# poked, so a change to the walk fixes every character at once.
+#
+# Tiles stay 16x16.  A 24x32 actor is drawn centred on its 16px footprint
+# with its feet on the bottom edge, which the renderer works out from the
+# sprite size.
+
+AW, AH = 24, 32
+
+
+class Grid:
+    """A tiny drawing surface over a character grid."""
+
+    def __init__(self, w=AW, h=AH):
+        self.w, self.h = w, h
+        self.g = [[TRANSPARENT] * w for _ in range(h)]
+
+    def px(self, x, y, ch):
+        if ch != TRANSPARENT and 0 <= x < self.w and 0 <= y < self.h:
+            self.g[y][x] = ch
+
+    def rect(self, x, y, w, h, ch):
+        for j in range(y, y + h):
+            for i in range(x, x + w):
+                self.px(i, j, ch)
+
+    def hline(self, x, y, w, ch):
+        self.rect(x, y, w, 1, ch)
+
+    def vline(self, x, y, h, ch):
+        self.rect(x, y, 1, h, ch)
+
+    def get(self, x, y):
+        if 0 <= x < self.w and 0 <= y < self.h:
+            return self.g[y][x]
+        return TRANSPARENT
+
+    def outline(self, ch="0"):
+        """Wrap the silhouette in a dark keyline, the way the tiles are."""
+        add = []
+        for y in range(self.h):
+            for x in range(self.w):
+                if self.g[y][x] != TRANSPARENT:
+                    continue
+                for ox, oy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    n = self.get(x + ox, y + oy)
+                    if n != TRANSPARENT and n != ch:
+                        add.append((x, y))
+                        break
+        for x, y in add:
+            self.g[y][x] = ch
+        return self
+
+    def frame(self):
+        return [row[:] for row in self.g]
+
+
+# Every actor is these nine colours.  Swapping them is what makes a farmer a
+# skeleton.
+def look(skin="n", skin2="N", hair="T", hair2="e", top="b", top2="B",
+         trim="5", legs="1", boot="T", boot2="e", belt="y", eye="0",
+         hood=False, cape=None, robe=False):
+    return dict(skin=skin, skin2=skin2, hair=hair, hair2=hair2, top=top,
+                top2=top2, trim=trim, legs=legs, boot=boot, boot2=boot2,
+                belt=belt, eye=eye, hood=hood, cape=cape, robe=robe)
+
+
+LOOKS = {
+    "player":   look(top="b", top2="B", trim="5", hair="T", hair2="e", belt="y"),
+    "elder":    look(skin="a", skin2="N", hair="5", hair2="4", top="P", top2="p",
+                     trim="y", legs="2", boot="e", boot2="0", robe=True),
+    "woman":    look(skin="n", skin2="N", hair="O", hair2="e", top="r", top2="R",
+                     trim="E", legs="2", robe=True),
+    "kid":      look(skin="n", skin2="a", hair="y", hair2="d", top="g", top2="G",
+                     trim="Y", legs="2"),
+    "smith":    look(skin="a", skin2="N", hair="e", hair2="0", top="O", top2="e",
+                     trim="4", legs="T", boot="e", boot2="0", belt="4"),
+    "sage":     look(skin="n", skin2="N", hair="5", hair2="4", top="B", top2="1",
+                     trim="c", legs="1", robe=True, hood=True),
+    "skeleton": look(skin="5", skin2="4", hair="5", hair2="4", top="4", top2="3",
+                     trim="5", legs="4", boot="3", boot2="2", belt="3", eye="0"),
+    "archer":   look(skin="a", skin2="N", hair="H", hair2="D", top="G", top2="H",
+                     trim="g", legs="T", boot="e", boot2="0", belt="T", hood=True),
+    "brute":    look(skin="g", skin2="G", hair="H", hair2="D", top="T", top2="e",
+                     trim="d", legs="T", boot="e", boot2="0", belt="y"),
+}
+
+
+def _head(c, L, facing, top_y, bob):
+    """Head block: hair shell, face, and the eyes that sell the facing."""
+    y = top_y + bob
+    hx, hw = 7, 10
+    c.rect(hx, y, hw, 10, L["skin"])
+    c.rect(hx, y + 8, hw, 2, L["skin2"])          # jaw shadow
+    if L["hood"]:
+        c.rect(hx - 1, y - 1, hw + 2, 6, L["top"])
+        c.rect(hx - 1, y + 4, 2, 5, L["top"])
+        c.rect(hx + hw - 1, y + 4, 2, 5, L["top"])
+        c.hline(hx - 1, y + 4, hw + 2, L["top2"])
+    else:
+        c.rect(hx, y - 1, hw, 4, L["hair"])       # hair shell
+        c.hline(hx, y - 1, hw, L["hair"])
+        c.rect(hx, y + 2, 2, 4, L["hair2"])       # sideburns
+        c.rect(hx + hw - 2, y + 2, 2, 4, L["hair2"])
+    if facing == "up":
+        # back of the head: all hair, no face
+        if L["hood"]:
+            c.rect(hx - 1, y - 1, hw + 2, 9, L["top"])
+            c.rect(hx - 1, y + 5, hw + 2, 3, L["top2"])
+        else:
+            c.rect(hx, y - 1, hw, 8, L["hair"])
+            c.rect(hx, y + 5, hw, 3, L["hair2"])
+        return
+    if facing == "down":
+        if not L["hood"]:
+            c.hline(hx + 1, y + 2, hw - 2, L["hair2"])      # fringe
+            c.px(hx + 3, y + 3, L["hair2"])
+            c.px(hx + hw - 4, y + 3, L["hair2"])
+        c.rect(hx + 2, y + 4, 2, 2, L["eye"])
+        c.rect(hx + hw - 4, y + 4, 2, 2, L["eye"])
+        c.px(hx + 2, y + 4, "6")
+        c.px(hx + hw - 4, y + 4, "6")
+        c.px(hx + 4, y + 6, L["skin2"])                     # nose
+        c.hline(hx + 4, y + 8, 2, L["skin2"])               # mouth line
+    else:                                          # profile
+        c.rect(hx, y, 3, 9, TRANSPARENT)           # narrow the far side
+        c.rect(hx + 1, y, 2, 9, L["skin2"])
+        if not L["hood"]:
+            c.rect(hx + 1, y - 1, 4, 3, L["hair"])
+            c.rect(hx + 1, y + 2, 2, 4, L["hair2"])
+        c.rect(hx + hw - 4, y + 4, 2, 2, L["eye"])
+        c.px(hx + hw - 4, y + 4, "6")
+        c.px(hx + hw - 1, y + 6, L["skin2"])
+
+
+def _torso(c, L, facing, y, bob):
+    ty = y + bob
+    if L["robe"]:
+        c.rect(8, ty, 8, 8, L["top"])
+        c.rect(7, ty + 5, 10, 6, L["top"])
+        c.rect(6, ty + 9, 12, 4, L["top2"])
+        c.hline(8, ty, 8, L["trim"])
+        c.vline(11, ty + 2, 9, L["trim"])
+        return
+    c.rect(8, ty, 8, 10, L["top"])
+    c.rect(8, ty + 7, 8, 3, L["top2"])
+    c.vline(8, ty + 1, 8, L["top2"])
+    c.vline(15, ty + 1, 8, L["top2"])
+    c.hline(8, ty, 8, L["trim"])                   # collar
+    if facing != "up":
+        c.vline(11, ty + 1, 6, L["trim"])          # front seam
+    c.hline(7, ty + 8, 10, L["belt"])              # belt
+    c.px(11, ty + 8, L["trim"])
+
+
+def _arms(c, L, facing, y, swing, punch=0):
+    ay = y + 1
+    if facing == "right":
+        c.rect(7, ay + 1, 2, 7, L["top2"])          # far arm, behind the body
+        c.rect(7, ay + 7, 2, 2, L["skin2"])
+        ax = 15
+        c.rect(ax, ay - swing + punch, 3, 6, L["top"])
+        c.vline(ax - 1, ay - swing + punch, 6, L["top2"])   # seam
+        c.rect(ax, ay + 5 - swing + punch, 3, 3, L["skin"])
+        return (ax + 1, ay + 7 - swing + punch)
+    c.rect(6, ay + swing, 2, 7, L["top"])
+    c.rect(16, ay - swing, 2, 7, L["top"])
+    c.vline(8, ay + swing, 7, L["top2"])            # seams either side
+    c.vline(15, ay - swing, 7, L["top2"])
+    c.rect(6, ay + 6 + swing, 2, 3, L["skin"])
+    c.rect(16, ay + 6 - swing, 2, 3, L["skin"])
+    c.hline(6, ay + 8 + swing, 2, L["skin2"])
+    c.hline(16, ay + 8 - swing, 2, L["skin2"])
+    return (17, ay + 8 - swing)
+
+
+def _legs(c, L, facing, y, phase):
+    """phase: 0 together, 1 left forward, -1 right forward."""
+    if L["robe"]:
+        c.rect(8, y, 8, 4, L["top2"])
+        c.rect(9, y + 3, 2, 2, L["boot"])
+        c.rect(13, y + 3, 2, 2, L["boot"])
+        return
+    lx, rx = 9, 13
+    ly = y + (0 if phase >= 0 else 1)
+    ry = y + (0 if phase <= 0 else 1)
+    c.rect(lx, ly, 3, 6, L["legs"])
+    c.rect(rx, ry, 3, 6, L["legs"])
+    c.rect(lx - (1 if phase > 0 else 0), ly + 5, 4, 3, L["boot"])
+    c.rect(rx - (0 if phase >= 0 else 1), ry + 5, 4, 3, L["boot"])
+    c.hline(lx - (1 if phase > 0 else 0), ly + 7, 4, L["boot2"])
+    c.hline(rx - (0 if phase >= 0 else 1), ry + 7, 4, L["boot2"])
+
+
+def _blade(c, hx, hy, facing, reach, color="5", edge="6", hilt="y"):
+    """A short sword in the hand, pointing where the swing goes."""
+    if facing == "right":
+        c.rect(hx, hy - 1, 2, 3, hilt)
+        c.rect(hx + 2, hy, reach, 2, color)
+        c.hline(hx + 2, hy, reach, edge)
+        c.px(hx + 2 + reach, hy, color)
+    elif facing == "left":
+        c.rect(hx - 1, hy - 1, 2, 3, hilt)
+        c.rect(hx - 1 - reach, hy, reach, 2, color)
+        c.hline(hx - 1 - reach, hy, reach, edge)
+    elif facing == "down":
+        c.rect(hx - 1, hy, 3, 2, hilt)
+        c.rect(hx, hy + 2, 2, reach, color)
+        c.vline(hx, hy + 2, reach, edge)
+    else:
+        c.rect(hx - 1, hy - 1, 3, 2, hilt)
+        c.rect(hx, hy - 1 - reach, 2, reach, color)
+        c.vline(hx, hy - 1 - reach, reach, edge)
+
+
+def actor(look_name, facing, pose="stand", frame=0):
+    """One 24x32 frame.  pose: stand | walk | attack."""
+    L = LOOKS[look_name]
+    flip = facing == "left"
+    if flip:
+        facing = "right"
+    c = Grid()
+    bob = 0
+    phase = 0
+    swing = 0
+    if pose == "walk":
+        phase = (0, 1, 0, -1)[frame % 4]
+        bob = -1 if frame % 2 else 0
+        swing = (0, 1, 0, -1)[frame % 4]
+    punch = 0
+    if pose == "attack":
+        bob = 0 if frame == 0 else -1
+        punch = 2 if frame == 0 else -3
+
+    _head(c, L, facing, 3, bob)
+    _torso(c, L, facing, 14, bob)
+    hand = _arms(c, L, facing, 14 + bob, swing, punch)
+    _legs(c, L, facing, 24 + bob, phase)
+
+    if pose == "attack":
+        hx, hy = hand
+        _blade(c, hx, hy, facing, 5 if frame == 0 else 9)
+    c.outline()
+    return mirror(c.frame()) if flip else c.frame()
+
+
+def walk_frames(name, facing):
+    return [actor(name, facing, "walk", i) for i in range(4)]
+
+
+def build_actors():
+    s = Sheet("actors", AW, AH)
+    for facing in ("down", "up", "left", "right"):
+        s.add("player_walk_" + facing, walk_frames("player", facing), 9)
+    for facing in ("down", "up", "left", "right"):
+        s.add("player_attack_" + facing,
+              [actor("player", facing, "attack", 0), actor("player", facing, "attack", 1)], 10)
+    s.add("player_hurt", [flash_white(actor("player", "down"))])
+
+    for who, sprite in (("elder", "npc_elder"), ("woman", "npc_woman"),
+                        ("kid", "npc_kid"), ("smith", "npc_smith"),
+                        ("sage", "npc_sage")):
+        s.add(sprite, [actor(who, "down", "walk", 0), actor(who, "down", "walk", 1),
+                       actor(who, "down", "walk", 2), actor(who, "down", "walk", 3)], 4)
+
+    s.add("skeleton_walk", walk_frames("skeleton", "right"), 7)
+    s.add("archer_idle", [actor("archer", "right"), actor("archer", "right", "walk", 1)], 3)
+    s.add("brute_walk", walk_frames("brute", "right"), 6)
+    return s
+
+
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     manifest = {
@@ -2067,7 +2344,6 @@ def main():
         "anims": {},
     }
     builders = {
-        "player": build_player,
         "npcs": build_npcs,
         "slime": build_slime,
         "skeleton": build_skeleton,
@@ -2081,6 +2357,7 @@ def main():
         "items": build_items,
         "ui": build_ui,
         "panel": build_panel,
+        "actors": build_actors,
     }
     only = set(sys.argv[1:])
     unknown = only - set(builders)

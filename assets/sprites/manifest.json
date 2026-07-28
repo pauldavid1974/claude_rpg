@@ -34,11 +34,6 @@
   "E": "#ead4aa"
  },
  "sheets": {
-  "player": {
-   "file": "player.png",
-   "cellW": 16,
-   "cellH": 16
-  },
   "npcs": {
    "file": "npcs.png",
    "cellW": 16,
@@ -103,112 +98,45 @@
    "file": "panel.png",
    "cellW": 48,
    "cellH": 48
+  },
+  "actors": {
+   "file": "actors.png",
+   "cellW": 24,
+   "cellH": 32
   }
  },
  "anims": {
-  "player_walk_down": {
-   "sheet": "player",
-   "row": 0,
-   "frames": 4,
-   "w": 16,
-   "h": 16,
-   "fps": 9
-  },
-  "player_walk_up": {
-   "sheet": "player",
-   "row": 1,
-   "frames": 4,
-   "w": 16,
-   "h": 16,
-   "fps": 9
-  },
-  "player_walk_right": {
-   "sheet": "player",
-   "row": 2,
-   "frames": 4,
-   "w": 16,
-   "h": 16,
-   "fps": 9
-  },
-  "player_walk_left": {
-   "sheet": "player",
-   "row": 3,
-   "frames": 4,
-   "w": 16,
-   "h": 16,
-   "fps": 9
-  },
-  "player_attack_down": {
-   "sheet": "player",
-   "row": 4,
-   "frames": 2,
-   "w": 16,
-   "h": 16,
-   "fps": 10
-  },
-  "player_attack_up": {
-   "sheet": "player",
-   "row": 5,
-   "frames": 2,
-   "w": 16,
-   "h": 16,
-   "fps": 10
-  },
-  "player_attack_right": {
-   "sheet": "player",
-   "row": 6,
-   "frames": 2,
-   "w": 16,
-   "h": 16,
-   "fps": 10
-  },
-  "player_attack_left": {
-   "sheet": "player",
-   "row": 7,
-   "frames": 2,
-   "w": 16,
-   "h": 16,
-   "fps": 10
-  },
-  "player_hurt": {
-   "sheet": "player",
-   "row": 8,
-   "frames": 1,
-   "w": 16,
-   "h": 16,
-   "fps": 0
-  },
   "npc_elder": {
-   "sheet": "npcs",
-   "row": 0,
-   "frames": 2,
-   "w": 16,
-   "h": 16,
-   "fps": 2
+   "sheet": "actors",
+   "row": 9,
+   "frames": 4,
+   "w": 24,
+   "h": 32,
+   "fps": 4
   },
   "npc_woman": {
-   "sheet": "npcs",
-   "row": 1,
-   "frames": 2,
-   "w": 16,
-   "h": 16,
-   "fps": 2
+   "sheet": "actors",
+   "row": 10,
+   "frames": 4,
+   "w": 24,
+   "h": 32,
+   "fps": 4
   },
   "npc_smith": {
-   "sheet": "npcs",
-   "row": 2,
-   "frames": 2,
-   "w": 16,
-   "h": 16,
-   "fps": 2
+   "sheet": "actors",
+   "row": 12,
+   "frames": 4,
+   "w": 24,
+   "h": 32,
+   "fps": 4
   },
   "npc_kid": {
-   "sheet": "npcs",
-   "row": 3,
-   "frames": 2,
-   "w": 16,
-   "h": 16,
-   "fps": 2
+   "sheet": "actors",
+   "row": 11,
+   "frames": 4,
+   "w": 24,
+   "h": 32,
+   "fps": 4
   },
   "slime_idle": {
    "sheet": "slime",
@@ -227,12 +155,12 @@
    "fps": 12
   },
   "skeleton_walk": {
-   "sheet": "skeleton",
-   "row": 0,
-   "frames": 2,
-   "w": 16,
-   "h": 16,
-   "fps": 5
+   "sheet": "actors",
+   "row": 14,
+   "frames": 4,
+   "w": 24,
+   "h": 32,
+   "fps": 7
   },
   "skeleton_die": {
    "sheet": "skeleton",
@@ -259,11 +187,11 @@
    "fps": 12
   },
   "archer_idle": {
-   "sheet": "archer",
-   "row": 0,
+   "sheet": "actors",
+   "row": 15,
    "frames": 2,
-   "w": 16,
-   "h": 16,
+   "w": 24,
+   "h": 32,
    "fps": 3
   },
   "archer_die": {
@@ -275,12 +203,12 @@
    "fps": 12
   },
   "brute_walk": {
-   "sheet": "brute",
-   "row": 0,
-   "frames": 2,
-   "w": 16,
-   "h": 16,
-   "fps": 3
+   "sheet": "actors",
+   "row": 16,
+   "frames": 4,
+   "w": 24,
+   "h": 32,
+   "fps": 6
   },
   "brute_die": {
    "sheet": "brute",
@@ -1025,6 +953,86 @@
    "w": 48,
    "h": 48,
    "fps": 0
+  },
+  "player_walk_down": {
+   "sheet": "actors",
+   "row": 0,
+   "frames": 4,
+   "w": 24,
+   "h": 32,
+   "fps": 9
+  },
+  "player_walk_up": {
+   "sheet": "actors",
+   "row": 1,
+   "frames": 4,
+   "w": 24,
+   "h": 32,
+   "fps": 9
+  },
+  "player_walk_left": {
+   "sheet": "actors",
+   "row": 2,
+   "frames": 4,
+   "w": 24,
+   "h": 32,
+   "fps": 9
+  },
+  "player_walk_right": {
+   "sheet": "actors",
+   "row": 3,
+   "frames": 4,
+   "w": 24,
+   "h": 32,
+   "fps": 9
+  },
+  "player_attack_down": {
+   "sheet": "actors",
+   "row": 4,
+   "frames": 2,
+   "w": 24,
+   "h": 32,
+   "fps": 10
+  },
+  "player_attack_up": {
+   "sheet": "actors",
+   "row": 5,
+   "frames": 2,
+   "w": 24,
+   "h": 32,
+   "fps": 10
+  },
+  "player_attack_left": {
+   "sheet": "actors",
+   "row": 6,
+   "frames": 2,
+   "w": 24,
+   "h": 32,
+   "fps": 10
+  },
+  "player_attack_right": {
+   "sheet": "actors",
+   "row": 7,
+   "frames": 2,
+   "w": 24,
+   "h": 32,
+   "fps": 10
+  },
+  "player_hurt": {
+   "sheet": "actors",
+   "row": 8,
+   "frames": 1,
+   "w": 24,
+   "h": 32,
+   "fps": 0
+  },
+  "npc_sage": {
+   "sheet": "actors",
+   "row": 13,
+   "frames": 4,
+   "w": 24,
+   "h": 32,
+   "fps": 4
   }
  }
 }
