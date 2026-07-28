@@ -80,6 +80,32 @@ function resize() {
 addEventListener('resize', resize);
 resize();
 
+// A blank canvas tells nobody anything.  If boot fails - a sheet that will
+// not decode, storage that throws - say so on screen where it can be read
+// and reported, rather than dying silently.
+function fatal(err) {
+  const ctx = G.ctx;
+  const msg = String((err && err.message) || err || 'unknown error');
+  try {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#181425';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#e43b44';
+    ctx.font = 'bold 16px monospace';
+    ctx.fillText('Emberdale could not start', 16, 32);
+    ctx.fillStyle = '#c0cbdc';
+    ctx.font = '13px monospace';
+    let y = 56;
+    for (const line of msg.match(/.{1,60}(\s|$)|.{1,60}/g) || [msg]) {
+      ctx.fillText(line.trim(), 16, y);
+      y += 18;
+    }
+    ctx.fillStyle = '#8b9bb4';
+    ctx.fillText('Reload to try again.', 16, y + 10);
+  } catch (e) { /* nothing left to draw with */ }
+  console.error('Emberdale boot failed:', err);
+}
+
 async function boot() {
   await loadAssets();
   await document.fonts.load('16px "Jacquard 12"').catch(() => {});
@@ -1187,4 +1213,5 @@ window.EMBER = {  // debug/testing handle
   isSolidAt, routeTo, isBlockedAt: feetBlockedAt, questAim, settings, openSummary,
   isNight, dayPhase,
 };
-boot();
+boot().catch(fatal);
+addEventListener('unhandledrejection', (e) => fatal(e.reason));
