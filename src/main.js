@@ -8,9 +8,9 @@ import { buildMap, outsideCell } from './maps.js';
 import {
   createPlayer, updatePlayerMovement, updateMonster, updateNpc,
   spawnMonster, spawnNpc, feetBox, moveEntity, facePoint,
-  startDodge, canDodge, monsterAttackBox, attackProfile, poisonPlayer, DODGE,
+  startDodge, canDodge, monsterAttackBox, attackProfile, poisonPlayer, playerStats, DODGE,
 } from './entities.js';
-import { startAttack, updateCombat, hitMonster } from './combat.js';
+import { startAttack, updateCombat, hitMonster, gainXp } from './combat.js';
 import { routeTo, feetCenter } from './pathfind.js';
 import { drawLighting, drawGrade, drawShadow } from './lighting.js';
 import { updateParticles, drawParticles, drawFloats, sparkle, dust, addFloat } from './particles.js';
@@ -19,6 +19,8 @@ import {
   useQuick, useConsumable, countItem, QUICK_SLOTS,
 } from './inventory.js';
 import { openQuests, updateQuests, drawQuests } from './quests.js';
+import { openSkills, updateSkills, drawSkills, refreshDerived, respec, RESPEC_COST } from './skills.js';
+import * as skills from './skills.js';
 import { updateDialogue, drawDialogue, talkTo, say, dialogueState } from './dialogue.js';
 import { updateShop, drawShop, SHOPS } from './shops.js';
 import {
@@ -120,6 +122,7 @@ function newGame() {
   G.quests = {};
   G.flags = {};
   G.mode = 'play';
+  refreshDerived(true);
   changeMap('town1', 12, 10);
   say('Elder Rowan', [
     'Welcome to Emberdale, traveler. Dark times - but you look capable.',
@@ -134,6 +137,7 @@ function continueGame(save) {
   G.flags = save.flags || {};
   G.muted = !!save.muted;
   G.mode = 'play';
+  refreshDerived();
   changeMap(save.mapName || 'town1', 2, 2);
   G.player.x = save.player.x;
   G.player.y = save.player.y;
@@ -252,6 +256,7 @@ function loop(ts) {
     case 'dialogue': updateDialogue(dt); updateWorldAmbient(dt); break;
     case 'inventory': updateInventory(dt); break;
     case 'quests': updateQuests(dt); break;
+    case 'skills': updateSkills(dt); break;
     case 'shop': updateShop(dt); break;
     case 'pause': {
       const act = updatePause();
@@ -297,6 +302,7 @@ function hudButtonClick() {
       pressKey('hud_' + b.id);
       if (b.id === 'inv') openInventory();
       else if (b.id === 'quest') openQuests();
+      else if (b.id === 'skills') openSkills();
       else if (b.id === 'dodge') dodgeNow();
       else if (b.id.startsWith('quick')) useQuick(+b.id.slice(5));
       else { G.mode = 'pause'; G.ui.pause = { sel: 0 }; sfx('menu'); }
@@ -399,6 +405,7 @@ function updatePlay(dt) {
   if (input.pressed.pause) { G.mode = 'pause'; G.ui.pause = { sel: 0 }; sfx('menu'); return; }
   if (input.pressed.inv) { openInventory(); return; }
   if (input.pressed.quest) { openQuests(); return; }
+  if (input.pressed.skills) { openSkills(); return; }
   if (input.pressed.interact) { tryInteract(); if (G.mode !== 'play') return; }
   if (input.pressed.attack) startAttack();
   if (input.pressed.dodge) dodgeNow();
@@ -626,6 +633,7 @@ function draw() {
     case 'dialogue': drawDialogue(ctx); break;
     case 'inventory': drawInventory(ctx); break;
     case 'quests': drawQuests(ctx); break;
+    case 'skills': drawSkills(ctx); break;
     case 'shop': drawShop(ctx); break;
     case 'pause': drawPause(ctx); break;
     case 'gameover': drawGameover(ctx, G.ui.gameoverT); break;
@@ -887,5 +895,6 @@ function drawMonster(ctx, m, cx, cy) {
 window.EMBER = {  // debug/testing handle
   G, changeMap, dialogueState, spawnMonster, startDodge, hitMonster,
   addItem, countItem, useQuick, useConsumable, poisonPlayer, SHOPS,
+  skills, gainXp, playerStats,
 };
 boot();

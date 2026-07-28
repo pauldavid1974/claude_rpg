@@ -6,6 +6,7 @@ import { sfx } from './audio.js';
 import { spawnPix, spawnEffect, addFloat, sparkle } from './particles.js';
 import { addItem } from './inventory.js';
 import { onKill } from './quests.js';
+import { POINTS_PER_LEVEL, bonuses } from './skills.js';
 
 export function xpNeed(level) { return 12 + level * 8; }
 
@@ -120,10 +121,10 @@ export function gainXp(n) {
   while (p.xp >= xpNeed(p.level)) {
     p.xp -= xpNeed(p.level);
     p.level++;
-    p.maxHp += 2;
+    p.sp = (p.sp || 0) + POINTS_PER_LEVEL;
     p.hp = p.maxHp;
     sfx('levelup');
-    G.banner = { text: 'LEVEL ' + p.level + '!  Max HP up, damage up', t: 2.5 };
+    G.banner = { text: 'LEVEL ' + p.level + '!  +' + POINTS_PER_LEVEL + ' skill points', t: 2.5 };
     sparkle(p.x + 8, p.y + 8, 14, '#fee761');
   }
 }

@@ -13,6 +13,7 @@ import {
 } from './quests.js';
 import { addItem, hasItem, removeItem } from './inventory.js';
 import { openShop } from './shops.js';
+import { spentPoints, respec, RESPEC_COST } from './skills.js';
 
 // A script: { name, pages: [str], choice?: {prompt, yes, no, onYes, onNo}, onDone }
 let script = null, page = 0, chars = 0, choiceSel = 0, choosing = false;
@@ -281,9 +282,33 @@ function sage(npc) {
     return say(npc.name, ['The bone key opens the inner gate. The King will be beyond it. Potions, steel, courage - in that order.']);
   }
   if (G.flags.mainDone) {
-    return say(npc.name, ['The amulet is home and the dead sleep. You did well, traveler.']);
+    return offerRespec(npc, ['The amulet is home and the dead sleep. You did well, traveler.']);
   }
-  return say(npc.name, ['Hmm? I am busy with my herbs. If Rowan sends word, bring it quickly.']);
+  return offerRespec(npc, ['Hmm? I am busy with my herbs. If Rowan sends word, bring it quickly.']);
+}
+
+// Mira will unpick everything you have learned, for a fee.
+function offerRespec(npc, lead) {
+  if (spentPoints() === 0) return say(npc.name, lead);
+  return say(npc.name, [
+    ...lead,
+    'You carry habits like a coat, traveler. I can unpick the stitching - all of it - for ' +
+      RESPEC_COST + ' gold. Your points come back to you.',
+  ], {
+    choice: {
+      prompt: 'Unlearn?', yes: 'Unpick it (' + RESPEC_COST + 'g)', no: 'Leave it be',
+      onYes: () => {
+        if (G.player.gold < RESPEC_COST) {
+          sfx('deny');
+          return say(npc.name, ['Coin first. I do not work on promises.']);
+        }
+        G.player.gold -= RESPEC_COST;
+        respec();
+        say(npc.name, ['There. A blank slate, and every point back in your hands.']);
+      },
+      onNo: () => say(npc.name, ['As you like. The offer keeps.']),
+    },
+  });
 }
 
 function lila(npc) {

@@ -8,6 +8,7 @@ import { addFloat, sparkle } from './particles.js';
 import { drawPanel, drawText, drawTextC, drawHeading } from './ui.js';
 import { drawAnim } from './assets.js';
 import { playerThrow } from './combat.js';
+import { bonuses } from './skills.js';
 
 export const COLS = 6, ROWS = 4;
 export const QUICK_SLOTS = 3;
@@ -92,7 +93,7 @@ export function useConsumable(id) {
   switch (def.type) {
     case 'potion':
       if (p.hp >= p.maxHp) { sfx('deny'); return false; }
-      p.hp = Math.min(p.maxHp, p.hp + def.heal);
+      p.hp = Math.min(p.maxHp, p.hp + Math.round(def.heal * bonuses().healMult));
       sfx('heal');
       addFloat('+HP', p.x + 8, p.y - 4, '#63c74d');
       sparkle(p.x + 8, p.y + 6, 8, '#63c74d');
@@ -122,7 +123,7 @@ export function useConsumable(id) {
       return false;
   }
   removeItem(id, 1);
-  p.useCd = USE_CD;
+  p.useCd = USE_CD * bonuses().useCd;
   return true;
 }
 

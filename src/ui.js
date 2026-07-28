@@ -200,8 +200,8 @@ export function drawHud(ctx) {
   // --- measure the buttons first; they own the top-right --------------
   const bh = touch ? 17 : 13;
   const labels = narrow
-    ? [['inv', 'BAG'], ['quest', 'QST'], ['pause', 'MENU']]
-    : [['inv', 'BAG'], ['quest', 'QUESTS'], ['pause', 'MENU']];
+    ? [['inv', 'BAG'], ['quest', 'QST'], ['skills', 'SKL'], ['pause', 'MENU']]
+    : [['inv', 'BAG'], ['quest', 'QUESTS'], ['skills', 'SKILLS'], ['pause', 'MENU']];
   const btns = [];
   let bx = VW - 3;
   for (let i = labels.length - 1; i >= 0; i--) {
@@ -294,8 +294,16 @@ export function drawHud(ctx) {
   G.ui.hudButtons = [];
   for (const b of btns) {
     const hover = inButton(b);
+    // unspent points make the skills button glow
+    const nag = b.id === 'skills' && (p.sp || 0) > 0;
     drawSquishButton(ctx, b.x, b.y, b.w, b.h, b.label,
-                     { hover, press: pressAmount('hud_' + b.id) });
+                     { hover, press: pressAmount('hud_' + b.id),
+                       tone: nag ? 'accent' : null,
+                       selected: nag && Math.floor(G.time * 2) % 2 === 0 });
+    if (nag) {
+      ctx.fillStyle = '#e43b44';
+      ctx.beginPath(); ctx.arc(b.x + b.w - 1, b.y + 1, 2.5, 0, 7); ctx.fill();
+    }
     G.ui.hudButtons.push(b);
   }
 
@@ -304,7 +312,7 @@ export function drawHud(ctx) {
   if (G.mode === 'play') {
     const rw = touch ? 34 : 28, rh = touch ? 20 : 16;
     const rb = { id: 'dodge', label: 'ROLL', x: VW - rw - 4, y: VH - rh - 4, w: rw, h: rh };
-    const cd = p.dodgeCd > 0 ? Math.min(1, p.dodgeCd / (DODGE.time + DODGE.cd)) : 0;
+    const cd = p.dodgeCd > 0 ? Math.min(1, p.dodgeCd / (p.dodgeMax || DODGE.time + DODGE.cd)) : 0;
     drawSquishButton(ctx, rb.x, rb.y, rb.w, rb.h, rb.label, {
       hover: inButton(rb), press: pressAmount('hud_dodge'),
       cooldown: cd, tone: cd ? null : 'accent',

@@ -13,6 +13,7 @@ const KEYMAP = {
   Digit1: 'q1', Digit2: 'q2', Digit3: 'q3',
   KeyI: 'inv', Tab: 'inv',
   KeyQ: 'quest',
+  KeyU: 'skills',
   Escape: 'pause',
   KeyM: 'mute',
 };

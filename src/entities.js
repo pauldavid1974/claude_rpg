@@ -5,6 +5,7 @@ import { isSolidAt } from './maps.js';
 import { damagePlayer, monsterShoot } from './combat.js';
 import { sfx } from './audio.js';
 import { dust, spawnPix } from './particles.js';
+import { bonuses } from './skills.js';
 
 // --- collision helpers -------------------------------------------------
 
@@ -61,6 +62,7 @@ export function createPlayer() {
     hp: 10, maxHp: 10, level: 1, xp: 0, gold: 25,
     weapon: 'dagger', armor: null,
     inv: [{ id: 'dagger', n: 1 }, { id: 'potion', n: 2 }],
+    sp: 0, skills: {},
     attackT: 0, attackDir: 'down', iframes: 0,
     dodgeT: 0, dodgeCd: 0, dodgeAng: 0,
     useCd: 0, hasteT: 0, poison: 0, poisonWard: 0, poisonTick: 0,
@@ -83,10 +85,12 @@ export function canDodge() {
 export function startDodge(ang) {
   const p = G.player;
   if (!canDodge()) return false;
+  const b = bonuses();
   p.dodgeT = DODGE.time;
-  p.dodgeCd = DODGE.time + DODGE.cd;
+  p.dodgeCd = DODGE.time + DODGE.cd * b.dodgeCd;
+  p.dodgeMax = p.dodgeCd;
   p.dodgeAng = ang;
-  p.iframes = Math.max(p.iframes, DODGE.iframes);
+  p.iframes = Math.max(p.iframes, DODGE.iframes * b.iframes);
   p.attackT = 0;
   p.kbx = p.kby = 0;
   if (Math.abs(Math.cos(ang)) > Math.abs(Math.sin(ang))) p.dir = Math.cos(ang) < 0 ? 'left' : 'right';
@@ -98,13 +102,16 @@ export function startDodge(ang) {
 
 export function playerStats() {
   const p = G.player;
+  const b = bonuses();
   const wAtk = p.weapon ? (p.weapon === 'dagger' ? 1 : p.weapon === 'sword' ? 3 : 6) : 0;
   const aDef = p.armor ? (p.armor === 'leather' ? 1 : p.armor === 'chain' ? 3 : 6) : 0;
   return {
-    atk: 1 + Math.floor((p.level - 1) / 2) + wAtk,
-    def: aDef,
+    atk: 1 + b.atk + wAtk,
+    def: aDef + b.def,
     // heavier steel rocks an enemy harder
-    poise: p.weapon === 'sword' ? 1.6 : p.weapon === 'greatsword' ? 2.8 : 1,
+    poise: (p.weapon === 'sword' ? 1.6 : p.weapon === 'greatsword' ? 2.8 : 1) * b.poise,
+    crit: b.crit,
+    critMult: b.critMult,
   };
 }
 
@@ -155,7 +162,7 @@ export function updatePlayerMovement(dt, dx, dy) {
     if (Math.abs(dx) > Math.abs(dy)) p.dir = dx < 0 ? 'left' : 'right';
     else p.dir = dy < 0 ? 'up' : 'down';
     const len = Math.hypot(dx, dy);
-    const step = p.speed * (p.hasteT > 0 ? 1.5 : 1) * dt;
+    const step = p.speed * bonuses().speed * (p.hasteT > 0 ? 1.5 : 1) * dt;
     moveEntity(p, dx / len * step, 0);
     moveEntity(p, 0, dy / len * step);
     p.animT += dt;
