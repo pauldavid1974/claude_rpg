@@ -21,7 +21,7 @@ const KEYMAP = {
 export const input = {
   held: {},
   pressed: {},   // true for one frame after keydown
-  mouse: { x: 0, y: 0, clicked: false, rclicked: false, held: false },
+  mouse: { x: 0, y: 0, clicked: false, rclicked: false, held: false, rheld: false },
   anyKey: false, // true for one frame on any keydown (title screen)
 };
 
@@ -44,7 +44,7 @@ export function initInput(onFirstGesture) {
     const b = KEYMAP[e.code];
     if (b) input.held[b] = false;
   });
-  addEventListener('blur', () => { input.held = {}; });
+  addEventListener('blur', () => { input.held = {}; input.mouse.held = input.mouse.rheld = false; });
 
   const canvas = document.getElementById('game');
   canvas.addEventListener('mousemove', (e) => {
@@ -55,10 +55,11 @@ export function initInput(onFirstGesture) {
   canvas.addEventListener('mousedown', (e) => {
     gesture();
     if (e.button === 0) { input.mouse.clicked = true; input.mouse.held = true; }
-    if (e.button === 2) input.mouse.rclicked = true;
+    if (e.button === 2) { input.mouse.rclicked = true; input.mouse.rheld = true; }
   });
   addEventListener('mouseup', (e) => {
     if (e.button === 0) input.mouse.held = false;
+    if (e.button === 2) input.mouse.rheld = false;
   });
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
 

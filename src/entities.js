@@ -2,7 +2,7 @@
 
 import { G, TILE } from './state.js';
 import { isSolidAt } from './maps.js';
-import { damagePlayer, monsterShoot } from './combat.js';
+import { damagePlayer, monsterShoot, moveset } from './combat.js';
 import { sfx } from './audio.js';
 import { dust, spawnPix } from './particles.js';
 import { bonuses } from './skills.js';
@@ -63,7 +63,8 @@ export function createPlayer() {
     weapon: 'dagger', armor: null,
     inv: [{ id: 'dagger', n: 1 }, { id: 'potion', n: 2 }],
     sp: 0, skills: {},
-    attackT: 0, attackDir: 'down', iframes: 0,
+    attackT: 0, attackDur: 0.26, attackDir: 'down', iframes: 0,
+    combo: 0, comboT: 0, heavy: false, chargeT: 0,
     dodgeT: 0, dodgeCd: 0, dodgeAng: 0,
     useCd: 0, hasteT: 0, poison: 0, poisonWard: 0, poisonTick: 0,
     quick: ['potion', null, null],
@@ -170,7 +171,14 @@ export function updatePlayerMovement(dt, dx, dy) {
   } else {
     p.animT = 0;
   }
-  if (p.attackT > 0) p.attackT -= dt;
+  if (p.attackT > 0) {
+    p.attackT -= dt;
+    // the swing lands: hold the string open for a beat
+    if (p.attackT <= 0) { p.comboT = moveset().window; p.heavy = false; }
+  } else if (p.comboT > 0) {
+    p.comboT -= dt;
+    if (p.comboT <= 0) p.combo = 0;
+  }
   if (p.iframes > 0) p.iframes -= dt;
 }
 
@@ -233,6 +241,7 @@ export function spawnMonster(type, tx, ty) {
     state: 'idle', t: Math.random() * 2, flip: false,
     hurtT: 0, kbx: 0, kby: 0, telegraphT: 0,
     atkPhase: 'none', atkT: 0, atkCd: Math.random() * 0.8, atkAng: 0, atkHit: false,
+    face: 0, prevX: tx * TILE, prevY: ty * TILE,
     staggerT: 0,
     vx: 0, vy: 0,
   };
@@ -267,6 +276,7 @@ export function updateMonster(m, dt) {
     m.atkPhase = 'none';
     m.atkT = 0;
     m.atkCd = Math.max(m.atkCd, 0.3);
+    faceFromMotion(m);
     return;
   }
   if (m.poise < m.poiseMax) {
@@ -282,6 +292,7 @@ export function updateMonster(m, dt) {
       // marker on the ground is a promise you can roll out of
       if (m.atkT > A.wind * 0.4) m.atkAng = Math.atan2(dy, dx);
       m.flip = Math.cos(m.atkAng) < 0;
+      m.face = m.atkAng;
       if (m.atkT <= 0) {
         m.atkPhase = 'strike';
         m.atkT = A.strike;
@@ -299,6 +310,7 @@ export function updateMonster(m, dt) {
       m.atkPhase = 'none';
       m.atkCd = A.cd;
     }
+    faceFromMotion(m);
     return;
   }
   if (A) {
@@ -307,7 +319,9 @@ export function updateMonster(m, dt) {
       m.atkPhase = 'wind';
       m.atkT = A.wind;
       m.atkAng = Math.atan2(dy, dx);
+      m.face = m.atkAng;
       sfx('telegraph');
+      faceFromMotion(m);
       return;
     }
   }
@@ -403,6 +417,15 @@ export function updateMonster(m, dt) {
       break;
     }
   }
+  faceFromMotion(m);
+}
+
+// Facing comes from where the monster actually went, not from where the
+// player is - otherwise nothing could ever be caught from behind.
+function faceFromMotion(m) {
+  const mvx = m.x - m.prevX, mvy = m.y - m.prevY;
+  if (mvx * mvx + mvy * mvy > 0.004) m.face = Math.atan2(mvy, mvx);
+  m.prevX = m.x; m.prevY = m.y;
 }
 
 // Poise damage from a hit; zero poise means a stagger.

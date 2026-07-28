@@ -37,8 +37,8 @@ export function spawnEffect(name, x, y) {
   G.particles.push({ effect: name, x, y, life: 0.28, maxLife: 0.28 });
 }
 
-export function addFloat(text, x, y, color) {
-  G.floats.push({ text, x, y, t: 0.8, color });
+export function addFloat(text, x, y, color, big = false) {
+  G.floats.push({ text, x, y, t: big ? 1.1 : 0.8, color, big });
 }
 
 export function updateParticles(dt) {
@@ -78,6 +78,7 @@ export function drawFloats(ctx) {
   ctx.textAlign = 'center';
   for (const f of G.floats) {
     ctx.globalAlpha = Math.min(1, f.t * 3);
+    ctx.font = f.big ? 'bold 9px monospace' : '7px monospace';
     ctx.fillStyle = '#181425';
     ctx.fillText(f.text, Math.round(f.x - G.cam.x) + 1, Math.round(f.y - G.cam.y) + 1);
     ctx.fillStyle = f.color;

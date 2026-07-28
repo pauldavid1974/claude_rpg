@@ -10,7 +10,10 @@ import {
   spawnMonster, spawnNpc, feetBox, moveEntity, facePoint,
   startDodge, canDodge, monsterAttackBox, attackProfile, poisonPlayer, playerStats, DODGE,
 } from './entities.js';
-import { startAttack, updateCombat, hitMonster, gainXp } from './combat.js';
+import {
+  startAttack, updateCombat, hitMonster, gainXp, moveset, attackBox,
+  CHARGE_MIN, CHARGE_FULL,
+} from './combat.js';
 import { routeTo, feetCenter } from './pathfind.js';
 import { drawLighting, drawGrade, drawShadow } from './lighting.js';
 import { updateParticles, drawParticles, drawFloats, sparkle, dust, addFloat } from './particles.js';
@@ -312,6 +315,34 @@ function hudButtonClick() {
   return false;
 }
 
+// Keep holding attack after a swing and the next one winds up: release a
+// full charge for a heavy blow that shatters guards.
+function updateCharge(dt) {
+  const p = G.player;
+  const held = input.held.attack || input.mouse.rheld;
+  if (held && p.attackT <= 0 && p.dodgeT <= 0 && G.mode === 'play') {
+    p.chargeT += dt;
+    if (p.chargeT >= CHARGE_MIN) {
+      if (!p.chargeRang) { p.chargeRang = true; sfx('charge'); }
+      if (Math.random() < dt * 34) {
+        const a = Math.random() * Math.PI * 2, r = 10 + Math.random() * 4;
+        G.particles.push({
+          x: p.x + 8 + Math.cos(a) * r, y: p.y + 9 + Math.sin(a) * r,
+          vx: -Math.cos(a) * 26, vy: -Math.sin(a) * 26, g: 0,
+          life: 0.3, maxLife: 0.3, color: '#fee761', size: 1, twinkle: true,
+        });
+      }
+    }
+    return;
+  }
+  if (p.chargeT > 0) {
+    const full = p.chargeT >= CHARGE_MIN;
+    p.chargeT = 0;
+    p.chargeRang = false;
+    if (full && p.attackT <= 0 && p.dodgeT <= 0) startAttack(true);
+  }
+}
+
 // Roll the way you're heading: the keyboard vector if there is one, else
 // away along the facing.  Cancels any click-to-move goal.
 function dodgeNow() {
@@ -409,6 +440,7 @@ function updatePlay(dt) {
   if (input.pressed.interact) { tryInteract(); if (G.mode !== 'play') return; }
   if (input.pressed.attack) startAttack();
   if (input.pressed.dodge) dodgeNow();
+  updateCharge(dt);
   for (let i = 0; i < QUICK_SLOTS; i++) {
     if (input.pressed['q' + (i + 1)]) { pressKey('hud_quick' + i); useQuick(i); }
   }
@@ -822,6 +854,20 @@ function drawTelegraph(ctx, m, cx, cy) {
 
 function drawPlayer(ctx, cx, cy) {
   const p = G.player;
+  if (p.chargeT >= CHARGE_MIN * 0.55 && p.attackT <= 0) {
+    const k = Math.min(1, (p.chargeT - CHARGE_MIN * 0.55) / (CHARGE_FULL - CHARGE_MIN * 0.55));
+    const full = p.chargeT >= CHARGE_MIN;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.2 + 0.35 * k;
+    ctx.strokeStyle = full ? '#fee761' : '#feae34';
+    ctx.lineWidth = 1;
+    const r = 13 - 4 * k + (full ? Math.sin(G.time * 18) * 0.8 : 0);
+    ctx.beginPath();
+    ctx.arc(Math.round(p.x - cx) + 8, Math.round(p.y - cy) + 9, r, 0, 7);
+    ctx.stroke();
+    ctx.restore();
+  }
   // the roll: quarter-turn tumble, so the pixels stay exact
   if (p.dodgeT > 0) {
     const k = 1 - p.dodgeT / DODGE.time;
@@ -895,6 +941,6 @@ function drawMonster(ctx, m, cx, cy) {
 window.EMBER = {  // debug/testing handle
   G, changeMap, dialogueState, spawnMonster, startDodge, hitMonster,
   addItem, countItem, useQuick, useConsumable, poisonPlayer, SHOPS,
-  skills, gainXp, playerStats,
+  skills, gainXp, playerStats, startAttack, moveset, attackBox,
 };
 boot();
