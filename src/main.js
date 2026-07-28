@@ -660,6 +660,19 @@ function updateWorldAmbient(dt) {
   updateParticles(dt);
   if (G.shake > 0) G.shake = Math.max(0, G.shake - dt * 18);
 
+  // woodsmoke drifting off the chimneys
+  for (const pr of G.map.props) {
+    if (pr.type !== 'chimney' || Math.random() > dt * 9) continue;
+    const x = pr.x * TILE + 8, y = pr.y * TILE - 9;
+    if (x < G.cam.x - 16 || x > G.cam.x + VW + 16 ||
+        y < G.cam.y - 24 || y > G.cam.y + VH + 16) continue;
+    G.particles.push({
+      x: x + (Math.random() - 0.5) * 3, y,
+      vx: 5 + Math.random() * 7, vy: -9 - Math.random() * 5, g: -2,
+      life: 1.4 + Math.random() * 1.2, maxLife: 2.6,
+      color: Math.random() < 0.5 ? '#c0cbdc' : '#8b9bb4', size: Math.random() < 0.4 ? 2 : 1,
+    });
+  }
   // embers lifting off every torch in view
   for (const pr of G.map.props) {
     if (pr.type !== 'torch' || Math.random() > dt * 3) continue;
@@ -830,7 +843,7 @@ function drawWorld(ctx) {
   for (const pr of map.props) {
     const sx = pr.x * TILE + 8 - cx, sy = pr.y * TILE + 15 - cy;
     if (sx < -24 || sy < -24 || sx > VW + 24 || sy > VH + 24) continue;
-    if (pr.type === 'torch' || pr.type === 'gate') continue;
+    if (pr.type === 'torch' || pr.type === 'gate' || pr.type === 'chimney') continue;
     drawShadow(ctx, sx, sy, pr.type === 'sign' ? 4 : 6);
   }
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
@@ -873,6 +886,11 @@ function drawWorld(ctx) {
     else if (pr.type === 'torch') { name = 'torch'; fi = frameOf('torch', G.time + pr.x * 0.13); }
     else if (pr.type === 'barrel') name = 'barrel';
     else if (pr.type === 'gate') name = 'gate_bars';
+    else if (pr.type === 'chimney') {
+      // drawn proud of its tile so the stack rises past the ridge
+      drawAnim(ctx, 'chimney', 0, px - cx, py - 11 - cy);
+      continue;
+    }
     else if (pr.type === 'crack') name = 'cracked_wall';
     else if (pr.type === 'note') name = 'note';
     else if (pr.type === 'spikes') {

@@ -6,8 +6,11 @@
 import { TILE } from './state.js';
 
 const GRASS = new Set(['.', ',', ':', ';', 't', 'r']);
-const SOLID = new Set(['t', 'r', 'w', 'W', 'U', 'V', 'R', 'b',
-                       '[', ']', '{', '}', '=', '_', 'O']);
+// Facade chars: R [ ] = 4 5 are the red roof (ridge mid/left/right, then
+// eave mid/left/right); b { } _ 6 7 the blue.  W is the upper timber wall,
+// # the lower one with its stone plinth, O a window and $ the front door.
+const SOLID = new Set(['t', 'r', 'w', 'W', '#', 'U', 'V', 'R', 'b',
+                       '[', ']', '{', '}', '=', '_', '4', '5', '6', '7', 'O']);
 
 // Stable per-tile hash, for picking sprite variants and decals.
 function hash2(x, y, salt = 0) {
@@ -55,19 +58,26 @@ function scatter(m, ch, region, density, seed) {
     if (m[j] && GRASS.has(m[j][i]) && m[j][i] !== 't' && r() < density) m[j][i] = ch;
   }
 }
-// Facade: gabled roof with slope caps, an overhanging eave, a window row
-// and a wall row with the door.
-function building(m, x, y, w, roof) {
+// Facade, four rows deep: a hipped ridge, the eave that overhangs it, a
+// window row and the row with the door.  Returns the door tile.
+function building(m, x, y, w, roof, chimney = true) {
   const blue = roof === 'b';
-  rect(m, x, y, w, 1, roof);
-  m[y][x] = blue ? '{' : '[';
-  m[y][x + w - 1] = blue ? '}' : ']';
-  rect(m, x, y + 1, w, 1, blue ? '_' : '=');
-  rect(m, x, y + 2, w, 2, 'W');
+  const T = blue
+    ? { ridge: 'b', rl: '{', rr: '}', eave: '_', el: '6', er: '7' }
+    : { ridge: 'R', rl: '[', rr: ']', eave: '=', el: '4', er: '5' };
+  rect(m, x, y, w, 1, T.ridge);
+  m[y][x] = T.rl;
+  m[y][x + w - 1] = T.rr;
+  rect(m, x, y + 1, w, 1, T.eave);
+  m[y + 1][x] = T.el;
+  m[y + 1][x + w - 1] = T.er;
+  rect(m, x, y + 2, w, 1, 'W');
+  rect(m, x, y + 3, w, 1, '#');
   const door = x + Math.floor(w / 2);
   m[y + 2][door - 2] = 'O';                                   // windows flank
   m[y + 2][door + 2] = 'O';                                   // the doorway
-  m[y + 3][door] = 'D';
+  m[y + 3][door] = '$';
+  return { x: door, y: y + 3, chimney: chimney ? { x: x + 2, y } : null };
 }
 // Soften the hard rectangle of border trees into a ragged treeline.
 function fringe(m, seed) {
@@ -183,6 +193,7 @@ function town1() {
     ],
     monsters: [],
     props: [
+      { type: 'chimney', x: 5, y: 2 }, { type: 'chimney', x: 18, y: 2 },
       { type: 'sign', x: 8, y: 6, text: 'General Store\nPotions and provisions.' },
       { type: 'sign', x: 20, y: 6, text: "Elder Rowan's house." },
       { type: 'torch', x: 5, y: 5 }, { type: 'torch', x: 7, y: 5 },
@@ -218,6 +229,7 @@ function town2() {
     ],
     monsters: [],
     props: [
+      { type: 'chimney', x: 6, y: 2 }, { type: 'chimney', x: 19, y: 2 },
       { type: 'sign', x: 9, y: 6, text: "Sage Mira's house.\nKnock softly." },
       { type: 'sign', x: 17, y: 6, text: "Bram's Smithy\nSteel worth your gold." },
       { type: 'torch', x: 18, y: 5 }, { type: 'torch', x: 20, y: 5 },
@@ -452,10 +464,13 @@ const BUILDERS = {
 const TILE_SPRITES = {
   '.': 'grass_1', ',': 'grass_2', ':': 'grass_3', ';': 'grass_flowers',
   'F': 'floor_wood', 'S': 'floor_stone', 'D': 'door',
-  'W': 'wall_stone', 'U': 'wall_dungeon', 'V': 'wall_wood', 'O': 'wall_window',
-  'R': 'roof_red', 'b': 'roof_blue',
-  '[': 'roof_red_l', ']': 'roof_red_r', '=': 'roof_eave',
-  '{': 'roof_blue_l', '}': 'roof_blue_r', '_': 'roof_eave_blue',
+  'U': 'wall_dungeon', 'V': 'wall_wood',
+  'W': 'wall_timber', '#': 'wall_timber_base',
+  'O': 'wall_timber_window', '$': 'wall_timber_door',
+  'R': 'roof_red_ridge', '[': 'roof_red_ridge_l', ']': 'roof_red_ridge_r',
+  '=': 'roof_red_eave', '4': 'roof_red_eave_l', '5': 'roof_red_eave_r',
+  'b': 'roof_blue_ridge', '{': 'roof_blue_ridge_l', '}': 'roof_blue_ridge_r',
+  '_': 'roof_blue_eave', '6': 'roof_blue_eave_l', '7': 'roof_blue_eave_r',
 };
 const OVERLAYS = { 'r': 'stone' };
 const TREES = ['tree', 'tree', 'tree', 'tree_pine', 'tree_pine', 'tree_small', 'bush'];

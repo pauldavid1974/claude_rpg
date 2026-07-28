@@ -808,6 +808,7 @@ def build_boss_sheet():
 # ---------------------------------------------------------------------------
 # TERRAIN — programmatic tiles, all designed to tile seamlessly.
 # ---------------------------------------------------------------------------
+import math
 import random
 
 WAVE = [2, 2, 3, 2, 2, 3, 3, 2, 2, 3, 2, 2, 3, 3, 2, 2]  # shared edge wobble
@@ -1008,6 +1009,269 @@ def roof_tile(hi="F", base="r", lo="R"):
     return t
 
 
+# ---------------------------------------------------------------------------
+# Building facades
+# ---------------------------------------------------------------------------
+# A house is four tile rows: roof ridge, roof eave, upper wall, lower wall.
+# The roof is laid in real shingle courses rather than horizontal bands, the
+# gable ends are cut on a hip with a lit board instead of a black wedge, and
+# the eave carries a fascia that throws a shadow onto the wall beneath it.
+# Walls are half-timbered - lime plaster panels braced between posts, on a
+# stone plinth - which reads as a village rather than a keep.
+
+#                 highlight, body, shadow, seam
+ROOF_RED = ("F", "r", "R", "e")
+ROOF_BLUE = ("5", "b", "B", "1")
+
+
+def _tab(t, cy, x0, hi, lo, seam, body):
+    """One 4x4 shingle: a clipped light corner, shaded foot, seam to its right.
+
+    The highlight is deliberately short.  Running it the full width of every
+    tab is what turned the old roof into horizontal stripes.
+    """
+    for ry in range(4):
+        y = cy * 4 + ry
+        if not (0 <= y < 16):
+            continue
+        for dx in range(4):
+            x = x0 + dx
+            if not (0 <= x < 16):
+                continue
+            if ry == 3:
+                t[y][x] = seam if dx == 3 else lo
+            elif dx == 3 and ry > 0:
+                t[y][x] = lo
+            elif ry == 0 and dx < 2:
+                t[y][x] = hi
+            else:
+                t[y][x] = body
+
+
+def shingle_field(ramp, seed=5, rows=4, y0=0):
+    hi, base, lo, seam = ramp
+    rnd = random.Random(seed)
+    t = tile_fill(base)
+    tones = [base, base, base, base, base, lo]
+    for cy in range(y0, y0 + rows):
+        off = 2 if cy % 2 else 0
+        for k in range(-1, 5):
+            _tab(t, cy, k * 4 + off, hi, lo, seam,
+                 tones[rnd.randrange(len(tones))])
+    return t
+
+
+def roof_ridge(ramp, seed=9):
+    """Top row: a capping course sitting proud of the shingles below it."""
+    hi, base, lo, seam = ramp
+    t = shingle_field(ramp, seed, rows=3, y0=1)
+    for x in range(16):
+        t[0][x] = "0"                        # hard edge against the sky
+        t[1][x] = hi if x % 4 < 3 else base  # cap tiles, lit along the top
+        t[2][x] = base if x % 4 < 3 else lo
+        t[3][x] = seam                       # the cap shades the roof below
+    return t
+
+
+def roof_eave(ramp, seed=13):
+    """Bottom row: last courses, the fascia board, and its shadow."""
+    hi, base, lo, seam = ramp
+    t = shingle_field(ramp, seed, rows=2, y0=0)
+    for x in range(16):
+        t[8][x] = lo
+        t[9][x] = seam
+        t[10][x] = "t"                       # fascia, lit along the top
+        t[11][x] = "T"
+        t[12][x] = "T" if x % 4 else "e"     # rafter tails show through
+        t[13][x] = "0"
+        t[14][x] = "N"                       # overhang shades the wall below
+        t[15][x] = "N"
+    return t
+
+
+def gable(t, x_top, x_bot, right=False, board="5"):
+    """Cut the hip on one end of a roof row and run a lit board down it."""
+    out = [row[:] for row in t]
+    for y in range(16):
+        cut = int(round(x_top + (x_bot - x_top) * y / 15.0))
+        for x in range(16):
+            xx = 15 - x if right else x
+            if xx < cut - 3:
+                out[y][x] = TRANSPARENT
+            elif xx < cut - 2:
+                out[y][x] = "0"              # outer keyline
+            elif xx < cut:
+                out[y][x] = board            # the hip board catches the light
+            elif xx == cut:
+                out[y][x] = "e"              # and throws a line of shade
+    return out
+
+
+def eave_end(t, right=False):
+    """Return the fascia around the corner so the roof looks built."""
+    out = [row[:] for row in t]
+    x = 0 if not right else 15
+    x2 = 1 if not right else 14
+    for y in range(10, 14):
+        out[y][x] = "0"
+        out[y][x2] = "e"
+    for y in range(14, 16):
+        out[y][x] = TRANSPARENT
+        out[y][x2] = "0"
+    return out
+
+
+# --- walls ---------------------------------------------------------------
+
+def _plaster(t, y0, y1):
+    """Lime plaster: broad soft blotches, no speckle - speckle reads as dirt."""
+    for y in range(y0, y1):
+        for x in range(16):
+            v = (math.sin(x * 0.7 + y * 0.4) + math.sin(x * 0.31 - y * 0.9)) * 0.5
+            t[y][x] = "E" if v > -0.35 else "n"
+
+
+def _post(t, y0, y1):
+    """One upright per tile, so posts land every 16px along a wall."""
+    for y in range(y0, y1):
+        t[y][0] = "e"
+        t[y][1] = "T"
+        t[y][2] = "t"
+        t[y][3] = "N"                        # the post shades the plaster
+
+
+def _rail(t, y):
+    """A horizontal rail tying the posts together."""
+    for x in range(16):
+        t[y][x] = "t"
+        t[y + 1][x] = "T"
+        t[y + 2][x] = "e"
+
+
+def timber_wall(seed=3):
+    """Upper wall.  The eave tile above carries the shadow, so this one runs
+    straight into plaster - two dark bands stacked read as a gap, not a joint."""
+    t = tile_fill("E")
+    _plaster(t, 0, 16)
+    _post(t, 0, 16)
+    _rail(t, 9)
+    return t
+
+
+def timber_base(seed=4):
+    """Lower wall: plaster above, a stone plinth taking the ground."""
+    t = tile_fill("E")
+    _plaster(t, 0, 9)
+    _post(t, 0, 9)
+    for x in range(16):                      # sill beam over the stonework
+        t[9][x] = "t"
+        t[10][x] = "T"
+        t[11][x] = "e"
+    for y in range(12, 16):                  # plinth: two rough courses
+        for x in range(16):
+            seam = (x + (3 if y >= 14 else 0)) % 5 == 4
+            top = y in (12, 14)
+            t[y][x] = "1" if seam else ("4" if top else "3")
+    for x in range(16):
+        t[15][x] = "2" if t[15][x] == "3" else t[15][x]
+    return t
+
+
+def timber_window(seed=3):
+    """A window big enough to read: light frame, four panes, a deep sill."""
+    t = tile_fill("E")
+    _plaster(t, 0, 16)
+    _post(t, 0, 16)
+    for y in range(1, 14):                   # frame
+        for x in range(4, 15):
+            t[y][x] = "e"
+    for y in range(2, 12):                   # frame face, lit on top and left
+        for x in range(5, 14):
+            t[y][x] = "t" if (y == 2 or x == 5) else "T"
+    for y in range(3, 11):                   # glazing, warmer at the top left
+        for x in range(6, 13):
+            t[y][x] = "Y" if (y < 7 and x < 10) else "y"
+    for y in range(3, 11):                   # mullion
+        t[y][9] = "T"
+    for x in range(6, 13):
+        t[6][x] = "T"
+    for x in range(3, 16):                   # sill, proud of the wall
+        t[12][x] = "t"
+        t[13][x] = "T"
+        t[14][x] = "e"
+    return t
+
+
+def timber_door(seed=4):
+    """Planked door under an arched head, filling its tile, on a worn step."""
+    t = tile_fill("E")
+    _plaster(t, 0, 14)
+    for y in range(0, 14):                   # jamb and head
+        for x in range(1, 15):
+            t[y][x] = "e"
+    for y in range(1, 13):                   # leaf
+        for x in range(2, 14):
+            t[y][x] = "T" if x % 4 == 2 else "t"
+    for y in range(0, 5):                    # arch the head
+        for x in range(1, 15):
+            if abs(x * 2 - 15) + (4 - y) * 4 > 17:
+                t[y][x] = "e"
+    for x in range(2, 14):                   # iron bands
+        if t[3][x] != "e":
+            t[3][x] = "2"
+        t[10][x] = "2"
+    for y in range(1, 13):                   # the jamb throws a line of shade
+        if t[y][2] != "e":
+            t[y][2] = "T"
+    t[7][12] = "Y"                           # ring handle
+    t[8][12] = "y"
+    for x in range(0, 16):                   # step, worn pale where feet fall
+        t[13][x] = "5" if 3 < x < 12 else "4"
+        t[14][x] = "4" if 3 < x < 12 else "3"
+        t[15][x] = "2"
+    return t
+
+
+def chimney():
+    """A brick stack with a stone cap and a dark mouth, drawn proud of the
+    ridge so it rises off the roof rather than sitting flat on it."""
+    return F(
+        "................",
+        "................",
+        "....00000000....",
+        "....05555550....",
+        "....04444440....",
+        "....00000000....",
+        "....0e0000e0....",
+        "....0OtttdO0....",
+        "....0OdtttO0....",
+        "....0TOOOOT0....",
+        "....0OtttdO0....",
+        "....0OdtttO0....",
+        "....0TOOOOT0....",
+        "....0OtttdO0....",
+        "....0OdtttO0....",
+        "....00000000....",
+    )
+
+
+def build_facade(s):
+    for name, ramp, board in (("red", ROOF_RED, "F"), ("blue", ROOF_BLUE, "5")):
+        ridge = roof_ridge(ramp)
+        eave = roof_eave(ramp)
+        s.add("roof_%s_ridge" % name, [ridge])
+        s.add("roof_%s_ridge_l" % name, [gable(ridge, 11, 6, False, board)])
+        s.add("roof_%s_ridge_r" % name, [gable(ridge, 11, 6, True, board)])
+        s.add("roof_%s_eave" % name, [eave])
+        s.add("roof_%s_eave_l" % name, [eave_end(gable(eave, 6, 1, False, board), False)])
+        s.add("roof_%s_eave_r" % name, [eave_end(gable(eave, 6, 1, True, board), True)])
+    s.add("wall_timber", [timber_wall()])
+    s.add("wall_timber_base", [timber_base()])
+    s.add("wall_timber_window", [timber_window()])
+    s.add("wall_timber_door", [timber_door()])
+    s.add("chimney", [chimney()])
+
+
 def build_terrain():
     tree = F(
         ".....000000.....",
@@ -1205,6 +1469,7 @@ def build_terrain():
     s.add("roof_eave_blue", [recolor(roof_eave, {"R": "1", "r": "B"})])
     s.add("wall_window", [wall_window])
     s.add("door", [door])
+    build_facade(s)
     return s
 
 

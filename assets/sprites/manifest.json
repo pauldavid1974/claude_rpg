@@ -594,6 +594,142 @@
    "h": 16,
    "fps": 0
   },
+  "roof_red_ridge": {
+   "sheet": "terrain",
+   "row": 44,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "roof_red_ridge_l": {
+   "sheet": "terrain",
+   "row": 45,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "roof_red_ridge_r": {
+   "sheet": "terrain",
+   "row": 46,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "roof_red_eave": {
+   "sheet": "terrain",
+   "row": 47,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "roof_red_eave_l": {
+   "sheet": "terrain",
+   "row": 48,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "roof_red_eave_r": {
+   "sheet": "terrain",
+   "row": 49,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "roof_blue_ridge": {
+   "sheet": "terrain",
+   "row": 50,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "roof_blue_ridge_l": {
+   "sheet": "terrain",
+   "row": 51,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "roof_blue_ridge_r": {
+   "sheet": "terrain",
+   "row": 52,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "roof_blue_eave": {
+   "sheet": "terrain",
+   "row": 53,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "roof_blue_eave_l": {
+   "sheet": "terrain",
+   "row": 54,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "roof_blue_eave_r": {
+   "sheet": "terrain",
+   "row": 55,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "wall_timber": {
+   "sheet": "terrain",
+   "row": 56,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "wall_timber_base": {
+   "sheet": "terrain",
+   "row": 57,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "wall_timber_window": {
+   "sheet": "terrain",
+   "row": 58,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "wall_timber_door": {
+   "sheet": "terrain",
+   "row": 59,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "chimney": {
+   "sheet": "terrain",
+   "row": 60,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
   "dec_flowers_white": {
    "sheet": "decals",
    "row": 0,
