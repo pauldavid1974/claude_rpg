@@ -786,6 +786,22 @@
    "h": 16,
    "fps": 0
   },
+  "cracked_wall": {
+   "sheet": "props",
+   "row": 7,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "note": {
+   "sheet": "props",
+   "row": 8,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
   "item_dagger": {
    "sheet": "items",
    "row": 0,
@@ -925,6 +941,22 @@
   "item_draught": {
    "sheet": "items",
    "row": 17,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_shard": {
+   "sheet": "items",
+   "row": 18,
+   "frames": 1,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
+  "item_note": {
+   "sheet": "items",
+   "row": 19,
    "frames": 1,
    "w": 16,
    "h": 16,

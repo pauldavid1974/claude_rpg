@@ -126,9 +126,24 @@ function smashables(hb, swingId) {
     G.map.props.splice(i, 1);
     G.flags['smashed_' + pr.x + '_' + pr.y + '_' + G.mapName] = true;
     sfx('break');
-    G.shake = Math.max(G.shake, 3);
-    for (let k = 0; k < 12; k++) {
-      spawnPix(cx, cy, k % 2 ? '#733e39' : '#b86f50', 5, 90, 0.5);
+    G.shake = Math.max(G.shake, pr.type === 'crack' ? 6 : 3);
+    const stone = pr.type === 'crack';
+    for (let k = 0; k < (stone ? 22 : 12); k++) {
+      spawnPix(cx, cy, k % 2 ? (stone ? '#3a4466' : '#733e39')
+                             : (stone ? '#5a6988' : '#b86f50'), 5, 110, 0.6);
+    }
+    if (stone) {                                  // a walled-up alcove pays out
+      G.banner = { text: 'The wall gives way', t: 1.8 };
+      const loot = pr.loot || {};
+      for (let k = 0; k < (loot.gold || 0); k += 5) {
+        const a = Math.random() * Math.PI * 2;
+        G.pickups.push({ kind: 'coin', x: cx, y: cy, vx: Math.cos(a) * 70, vy: Math.sin(a) * 70 - 20, t: 0, value: 5 });
+      }
+      for (const it of loot.items || []) {
+        G.pickups.push({ kind: 'item', item: it, x: cx + (Math.random() - 0.5) * 10, y: cy + 4,
+                         vx: (Math.random() - 0.5) * 40, vy: -30, t: 0 });
+      }
+      continue;
     }
     const roll = Math.random();
     if (roll < 0.45) {
@@ -234,8 +249,12 @@ export function killMonster(m) {
   if (Math.random() < 0.18) {
     G.pickups.push({ kind: 'heart', x: cx, y: cy, vx: 0, vy: -20, t: 0 });
   }
+  if (m.elite && !m.spawned) {
+    G.pickups.push({ kind: 'item', item: 'shard', x: cx, y: cy + 4,
+                     vx: (Math.random() - 0.5) * 40, vy: -34, t: 0 });
+  }
   for (const [item, p] of DROP_TABLE[m.type]) {
-    if (Math.random() < p) {
+    if (Math.random() < (m.elite ? p * 1.6 : p)) {
       G.pickups.push({ kind: 'item', item, x: cx, y: cy + 4, vx: (Math.random() - 0.5) * 40, vy: -30, t: 0 });
     }
   }

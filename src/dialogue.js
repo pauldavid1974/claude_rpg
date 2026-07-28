@@ -11,7 +11,8 @@ import {
 import {
   isActive, isDone, canTurnIn, startQuest, turnIn, questProgress, QUESTS,
 } from './quests.js';
-import { addItem, hasItem, removeItem } from './inventory.js';
+import { addItem, hasItem, removeItem, countItem } from './inventory.js';
+import { ITEMS } from './items.js';
 import { openShop } from './shops.js';
 import { spentPoints, respec, RESPEC_COST } from './skills.js';
 
@@ -176,10 +177,17 @@ export function drawDialogue(ctx) {
 // --- NPC scripts -------------------------------------------------------
 
 export function talkTo(npc) {
+  if (npc.shop === 'blacksmith') {
+    return say(npc.name, ['Steel, leather, and no haggling. Or leave your\nblade on the anvil and I will see what it wants.'], {
+      choice: {
+        prompt: 'Smithy', yes: 'Show me your wares', no: 'Work my blade',
+        onYes: () => openShop('blacksmith'),
+        onNo: () => forge(npc),
+      },
+    });
+  }
   if (npc.shop) {
-    say(npc.name, [npc.shop === 'general'
-      ? 'Welcome in! Take a look at my wares.'
-      : 'Steel, leather, and no haggling. Have a look.'],
+    say(npc.name, ['Welcome in! Take a look at my wares.'],
       { onDone: () => openShop(npc.shop) });
     return;
   }
@@ -199,6 +207,63 @@ export function talkTo(npc) {
         : ['Mira talks to her herbs. I heard her thank one once.']);
   }
 }
+
+// --- the forge ----------------------------------------------------------
+// Gold plus grim shards buys a weapon up to +3.  Elites are the only
+// source of shards, so upgrading means picking fights you could avoid.
+
+export const UPGRADE_COST = [60, 140, 260];
+export const UPGRADE_SHARDS = [1, 2, 3];
+
+export function weaponLevel(id) {
+  return (G.player.upgrades && G.player.upgrades[id]) || 0;
+}
+
+export function weaponLabel(id) {
+  const n = weaponLevel(id);
+  return n ? ' +' + n : '';
+}
+
+function forge(npc) {
+  const p = G.player;
+  const w = p.weapon;
+  if (!w || !UPGRADEABLE[w]) {
+    return say(npc.name, ['Nothing on the anvil. Equip a blade and come back.']);
+  }
+  const lvl = weaponLevel(w);
+  const name = ITEMS[w].name;
+  if (lvl >= 3) {
+    return say(npc.name, [name + ' +3. That is as far as steel goes,\nand further than most smiths can take it.']);
+  }
+  const cost = UPGRADE_COST[lvl];
+  const need = UPGRADE_SHARDS[lvl];
+  const have = countItem('shard');
+  return say(npc.name, [
+    name + (lvl ? ' +' + lvl : '') + ' to +' + (lvl + 1) + '.',
+    'That runs ' + cost + ' gold and ' + need + ' grim shard' + (need === 1 ? '' : 's') +
+      '. You have ' + p.gold + ' gold and ' + have + '.',
+  ], {
+    choice: {
+      prompt: 'Forge?', yes: 'Do it', no: 'Not today',
+      onYes: () => {
+        if (p.gold < cost || countItem('shard') < need) {
+          sfx('deny');
+          return say(npc.name, ['Not enough. Shards come off the big ones -\nthe ones with the glow about them.']);
+        }
+        p.gold -= cost;
+        removeItem('shard', need);
+        p.upgrades = p.upgrades || {};
+        p.upgrades[w] = lvl + 1;
+        sfx('upgrade');
+        G.banner = { text: name + ' +' + (lvl + 1), t: 2.4 };
+        say(npc.name, ['There. Hold it a moment - feel where the weight went.']);
+      },
+      onNo: () => say(npc.name, ['The anvil keeps.']),
+    },
+  });
+}
+
+const UPGRADEABLE = { dagger: 1, sword: 1, greatsword: 1 };
 
 function elder(npc) {
   // Main-quest spine, in order.

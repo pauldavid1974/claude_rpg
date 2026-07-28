@@ -315,7 +315,10 @@ function dungeon() {
   rect(m, 17, 22, 2, 4, 'S');            // entrance passage south
   return {
     music: 'danger', grid: m,
-    exits: [{ x: 16, y: 25, w: 4, h: 1, to: 'overworld', tx: 21, ty: 2 }],
+    exits: [
+      { x: 17, y: 25, w: 2, h: 1, to: 'overworld', tx: 21, ty: 2 },
+      { x: 17, y: 2, w: 2, h: 1, to: 'dungeon2', tx: 16, ty: 20 },
+    ],
     npcs: [],
     monsters: [
       { type: 'skeleton', x: 8, y: 17 }, { type: 'skeleton', x: 10, y: 20 },
@@ -324,15 +327,16 @@ function dungeon() {
       { type: 'bat', x: 8, y: 6 },
       { type: 'archer', x: 12, y: 5 }, { type: 'archer', x: 29, y: 18 },
       { type: 'brute', x: 9, y: 8 }, { type: 'brute', x: 19, y: 12 },
-      { type: 'boss', x: 17, y: 4 },
     ],
     props: [
       { type: 'torch', x: 15, y: 17 }, { type: 'torch', x: 20, y: 17 },
       { type: 'torch', x: 16, y: 9 }, { type: 'torch', x: 21, y: 9 },
       { type: 'torch', x: 13, y: 1 }, { type: 'torch', x: 22, y: 1 },
-      { type: 'gate', id: 'crypt_gate', x: 19, y: 10 }, { type: 'gate', id: 'crypt_gate2', x: 20, y: 10 },
       { type: 'chest', id: 'dg_chest', x: 5, y: 15, loot: { gold: 60, items: ['potion_big'] } },
       { type: 'sign', x: 18, y: 21, text: 'Turn back. The Bone King\ndoes not share his hall.' },
+      { type: 'crack', id: 'd1_hidden', x: 10, y: 9, loot: { gold: 35, items: ['shard'] } },
+      { type: 'note', id: 'note_entry', x: 5, y: 21,
+        text: 'We sealed three floors, not one. Whoever reads this:\nthe stair down is behind the north hall. Do not take it.\nWe are writing this so nobody has to find out why.' },
       { type: 'barrel', x: 15, y: 19 }, { type: 'barrel', x: 20, y: 20 },
       { type: 'barrel', x: 6, y: 20 }, { type: 'barrel', x: 12, y: 15 },
       { type: 'barrel', x: 30, y: 13 }, { type: 'barrel', x: 23, y: 19 },
@@ -350,9 +354,93 @@ function dungeon() {
   };
 }
 
+// --- crypt, floor two: the flooded gallery ------------------------------
+// Tighter than the entry floor, ringed with alcoves, and a Warden of the
+// Deep sitting on the stair down.
+function dungeon2() {
+  const m = base(32, 24, 'U');
+  rect(m, 13, 18, 7, 5, 'S');            // arrival, stair up
+  rect(m, 3, 12, 12, 8, 'S');            // west gallery
+  rect(m, 18, 11, 11, 9, 'S');           // east gallery
+  rect(m, 11, 3, 11, 8, 'S');            // warden's hall
+  hline(m, 15, 8, 24, 'S'); hline(m, 16, 8, 24, 'S');
+  vline(m, 15, 10, 18, 'S'); vline(m, 16, 10, 18, 'S');
+  rect(m, 5, 4, 5, 5, 'S');              // sealed alcove, west
+  rect(m, 24, 4, 5, 5, 'S');             // sealed alcove, east
+  vline(m, 7, 9, 12, 'S');
+  vline(m, 26, 9, 11, 'S');
+  return {
+    music: 'danger', grid: m,
+    exits: [
+      { x: 15, y: 22, w: 3, h: 1, to: 'dungeon', tx: 17, ty: 4 },
+      { x: 15, y: 3, w: 2, h: 1, to: 'dungeon3', tx: 16, ty: 20 },
+    ],
+    npcs: [],
+    monsters: [
+      { type: 'skeleton', x: 6, y: 15 }, { type: 'skeleton', x: 11, y: 18 },
+      { type: 'skeleton', x: 22, y: 14 }, { type: 'skeleton', x: 26, y: 18 },
+      { type: 'bat', x: 9, y: 13 }, { type: 'bat', x: 20, y: 17 },
+      { type: 'bat', x: 27, y: 12 }, { type: 'bat', x: 5, y: 6 },
+      { type: 'archer', x: 13, y: 5 }, { type: 'archer', x: 20, y: 5 },
+      { type: 'brute', x: 16, y: 7, elite: true },   // the Warden of the Deep
+      { type: 'brute', x: 24, y: 16 },
+    ],
+    props: [
+      { type: 'torch', x: 14, y: 17 }, { type: 'torch', x: 18, y: 17 },
+      { type: 'torch', x: 12, y: 2 }, { type: 'torch', x: 20, y: 2 },
+      { type: 'torch', x: 4, y: 11 }, { type: 'torch', x: 27, y: 10 },
+      { type: 'barrel', x: 14, y: 20 }, { type: 'barrel', x: 18, y: 20 },
+      { type: 'barrel', x: 5, y: 18 }, { type: 'barrel', x: 27, y: 17 },
+      // the alcoves are walled up - listen for the hollow ones
+      { type: 'crack', id: 'd2_west', x: 7, y: 10, loot: { gold: 70, items: ['shard'] } },
+      { type: 'crack', id: 'd2_east', x: 26, y: 10, loot: { gold: 40, items: ['potion_big', 'draught'] } },
+      { type: 'note', id: 'note_warden', x: 10, y: 19,
+        text: 'Eighth day below. The Warden does not sleep, does not eat,\ndoes not tire. We took its arm off at the shoulder.\nIt picked the arm up.' },
+      { type: 'note', id: 'note_hollow', x: 3, y: 13,
+        text: 'The masons walled the alcoves shut the night we sealed\nthe hall. Whatever is behind them, it was ours first.\nStrike the cracked stone.' },
+      { type: 'spikes', x: 15, y: 12, period: 2.2, offset: 0 },
+      { type: 'spikes', x: 16, y: 12, period: 2.2, offset: 1.1 },
+      { type: 'spikes', x: 15, y: 11, period: 2.2, offset: 0.55 },
+      { type: 'spikes', x: 16, y: 11, period: 2.2, offset: 1.65 },
+      { type: 'chest', id: 'd2_chest', x: 27, y: 19, loot: { gold: 45, items: ['bomb'] } },
+    ],
+    pickups: [],
+  };
+}
+
+// --- crypt, floor three: the Bone King's hall ---------------------------
+function dungeon3() {
+  const m = base(30, 24, 'U');
+  rect(m, 13, 17, 6, 6, 'S');            // arrival
+  rect(m, 8, 11, 15, 7, 'S');            // antechamber
+  rect(m, 6, 2, 19, 10, 'S');            // the hall
+  vline(m, 15, 9, 17, 'S'); vline(m, 16, 9, 17, 'S');
+  return {
+    music: 'danger', grid: m,
+    exits: [{ x: 15, y: 22, w: 2, h: 1, to: 'dungeon2', tx: 16, ty: 5 }],
+    npcs: [],
+    monsters: [
+      { type: 'skeleton', x: 10, y: 13 }, { type: 'skeleton', x: 20, y: 13 },
+      { type: 'archer', x: 8, y: 4 }, { type: 'archer', x: 22, y: 4 },
+      { type: 'boss', x: 14, y: 5 },
+    ],
+    props: [
+      { type: 'torch', x: 7, y: 1 }, { type: 'torch', x: 23, y: 1 },
+      { type: 'torch', x: 14, y: 16 }, { type: 'torch', x: 18, y: 16 },
+      { type: 'gate', id: 'crypt_gate', x: 15, y: 10 },
+      { type: 'gate', id: 'crypt_gate2', x: 16, y: 10 },
+      { type: 'note', id: 'note_king', x: 12, y: 18,
+        text: 'He was a king once, and kind, they say. The amulet kept\nhis hall warm through nine winters. Then it kept him\nwarm, and then it kept him.' },
+      { type: 'barrel', x: 13, y: 20 }, { type: 'barrel', x: 18, y: 20 },
+    ],
+    pickups: [],
+  };
+}
+
 const BUILDERS = {
   overworld, town1, town2, store, smithy,
-  elder_house: elderHouse, sage_house: sageHouse, dungeon,
+  elder_house: elderHouse, sage_house: sageHouse,
+  dungeon, dungeon2, dungeon3,
 };
 
 // ---------------------------------------------------------------------------

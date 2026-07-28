@@ -9,6 +9,7 @@ import { drawPanel, drawText, drawTextC, drawHeading } from './ui.js';
 import { drawAnim } from './assets.js';
 import { playerThrow } from './combat.js';
 import { bonuses } from './skills.js';
+import { weaponLevel, weaponLabel } from './dialogue.js';
 
 export const COLS = 6, ROWS = 4;
 export const QUICK_SLOTS = 3;
@@ -251,6 +252,8 @@ export function drawInventory(ctx) {
       if (p.weapon === slot.id || p.armor === slot.id) {
         drawText(ctx, 'E', c.x + 1, c.y + 7, '#63c74d');
       }
+      const up = weaponLevel(slot.id);
+      if (up) drawText(ctx, '+' + up, c.x + 11, c.y + 8, '#fee761');
     }
   }
   // detail panel
@@ -259,7 +262,7 @@ export function drawInventory(ctx) {
   const stats = statsLine();
   if (slot) {
     const def = ITEMS[slot.id];
-    drawText(ctx, def.name, dx + 8, dy + 14, '#ffffff');
+    drawText(ctx, def.name + weaponLabel(slot.id), dx + 8, dy + 14, '#ffffff');
     drawWrapped(ctx, def.desc || '', dx + 8, dy + 26, dw - 16, '#c0cbdc');
     const hint = def.type === 'weapon' || def.type === 'armor'
       ? (p.weapon === slot.id || p.armor === slot.id ? 'E/click: unequip' : 'E/click: equip')

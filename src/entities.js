@@ -62,7 +62,7 @@ export function createPlayer() {
     hp: 10, maxHp: 10, level: 1, xp: 0, gold: 25,
     weapon: 'dagger', armor: null,
     inv: [{ id: 'dagger', n: 1 }, { id: 'potion', n: 2 }],
-    sp: 0, skills: {},
+    sp: 0, skills: {}, upgrades: {},
     attackT: 0, attackDur: 0.26, attackDir: 'down', iframes: 0,
     combo: 0, comboT: 0, heavy: false, chargeT: 0,
     dodgeT: 0, dodgeCd: 0, dodgeAng: 0,
@@ -104,7 +104,9 @@ export function startDodge(ang) {
 export function playerStats() {
   const p = G.player;
   const b = bonuses();
-  const wAtk = p.weapon ? (p.weapon === 'dagger' ? 1 : p.weapon === 'sword' ? 3 : 6) : 0;
+  const base = p.weapon ? (p.weapon === 'dagger' ? 1 : p.weapon === 'sword' ? 3 : 6) : 0;
+  const up = (p.weapon && p.upgrades && p.upgrades[p.weapon]) || 0;
+  const wAtk = base + up * 2;
   const aDef = p.armor ? (p.armor === 'leather' ? 1 : p.armor === 'chain' ? 3 : 6) : 0;
   return {
     atk: 1 + b.atk + wAtk,

@@ -25,6 +25,8 @@ export const ITEMS = {
                 desc: 'Purges venom and shrugs off the next dose.', stack: true },
   draught:    { name: 'Swift Draught', icon: 'item_draught', type: 'buff', price: 25,
                 desc: 'Half again as fast for eight seconds.', stack: true },
+  shard:      { name: 'Grim Shard', icon: 'item_shard', type: 'junk', price: 35,
+                desc: 'The hard little core an elite leaves behind. Smiths want them.', stack: true },
   gel:        { name: 'Slime Gel', icon: 'item_gel', type: 'junk', price: 4,
                 desc: 'Wobbly. The kid in Ashvale wants these.', stack: true },
   bone:       { name: 'Old Bone', icon: 'item_bone', type: 'junk', price: 6,

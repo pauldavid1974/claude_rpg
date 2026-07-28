@@ -1492,6 +1492,54 @@ def build_props():
         return f
 
     s.add("spikes", [spikes(0), spikes(1), spikes(2)])
+
+    # A dungeon block with a fault running through it - hit it and it goes.
+    cracked_wall = F(
+        "0000000000000000",
+        "0222222202222220",
+        "022232220222e220",
+        "02222e2202222220",
+        "0222222e02222220",
+        "0000000000000000",
+        "0220222222202222",
+        "022e2222e2220222",
+        "0222222222e02222",
+        "0222e22222202222",
+        "0000000000000000",
+        "0222222202222220",
+        "02222e2202e22220",
+        "0222222202222220",
+        "022e222202222e20",
+        "0000000000000000",
+    )
+    # the fault: a jagged dark seam top-to-bottom
+    for y, x in [(0, 7), (1, 7), (2, 8), (3, 8), (4, 7), (5, 7), (6, 6),
+                 (7, 6), (8, 7), (9, 8), (10, 8), (11, 9), (12, 8),
+                 (13, 7), (14, 7), (15, 8)]:
+        cracked_wall[y][x] = "0"
+        if x + 1 < 16 and y % 3 == 0:
+            cracked_wall[y][x + 1] = "1"
+    s.add("cracked_wall", [cracked_wall])
+
+    note = F(
+        "................",
+        "................",
+        "................",
+        "....00000000....",
+        "...0EEEEEEEE0...",
+        "...0EeeEEeeE0...",
+        "...0EEEEEEEE0...",
+        "...0EeeeEEeE0...",
+        "...0EEEEEEEE0...",
+        "...0EeeEEeeE0...",
+        "...0EEEEEEEE0...",
+        "...0EeeeeEEE0...",
+        "...0EEEEEEEE0...",
+        "....00000000....",
+        "................",
+        "................",
+    )
+    s.add("note", [note])
     return s
 
 
@@ -1785,6 +1833,45 @@ def build_items():
         "................",
     )
 
+    # Grim shard: the hard little core an elite leaves behind.  Smiths want
+    # them for the good work.
+    shard = F(
+        "................",
+        "................",
+        ".......00.......",
+        "......0pP0......",
+        ".....0ppPP0.....",
+        "....0cppPP0.....",
+        "....0cppPPP0....",
+        "...0ccppPPP0....",
+        "...0ccppPPP0....",
+        "....0cppPP0.....",
+        "....0cppPP0.....",
+        ".....0ppP0......",
+        ".....0pP0.......",
+        "......00........",
+        "................",
+        "................",
+    )
+    note_item = F(
+        "................",
+        "................",
+        "................",
+        "...00000000.....",
+        "..0EEEEEEEE0....",
+        "..0EeeEEeeE0....",
+        "..0EEEEEEEE0....",
+        "..0EeeeEEeE0....",
+        "..0EEEEEEEE0....",
+        "..0EeeEEeeE0....",
+        "..0EEEEEEEE0....",
+        "..0EeeeeEEE0....",
+        "..0EEEEEEEE0....",
+        "...00000000.....",
+        "................",
+        "................",
+    )
+
     s = Sheet("items", 16)
     s.add("item_dagger", [dagger])
     s.add("item_sword", [sword])
@@ -1804,6 +1891,8 @@ def build_items():
     s.add("item_bomb", [bomb])
     s.add("item_antidote", [antidote])
     s.add("item_draught", [draught])
+    s.add("item_shard", [shard])
+    s.add("item_note", [note_item])
     return s
 
 

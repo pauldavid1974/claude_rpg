@@ -4,11 +4,12 @@ import { G, VW, VH, TILE, setView, resetRun } from './state.js';
 import { loadAssets, drawAnim, drawAnimFlash, frameOf } from './assets.js';
 import { initInput, input, endFrame } from './input.js';
 import { initAudio, music, sfx, toggleMute, setMuted } from './audio.js';
-import { buildMap, outsideCell } from './maps.js';
+import { buildMap, outsideCell, isSolidAt } from './maps.js';
 import {
   createPlayer, updatePlayerMovement, updateMonster, updateNpc,
   spawnMonster, spawnNpc, feetBox, moveEntity, facePoint,
-  startDodge, canDodge, monsterAttackBox, attackProfile, poisonPlayer, playerStats, DODGE,
+  startDodge, canDodge, monsterAttackBox, attackProfile, poisonPlayer, playerStats,
+  feetBlockedAt, DODGE,
 } from './entities.js';
 import {
   startAttack, updateCombat, hitMonster, gainXp, moveset, attackBox,
@@ -48,6 +49,8 @@ G.ctx.imageSmoothingEnabled = false;
 // Zoom is chosen so the visible slice of world stays in a sane band no
 // matter the screen shape: never wider/taller than MAX (which is what
 // made phones feel like watching from orbit), never tighter than MIN.
+const TOTAL_NOTES = 4;   // crypt records hidden across the three floors
+
 const MAX_VIEW_W = 340, MAX_VIEW_H = 240;
 const MIN_VIEW_W = 150, MIN_VIEW_H = 110;
 
@@ -94,6 +97,7 @@ export function changeMap(name, tx, ty) {
     if (p.type === 'chest') p.solid = true;
     if (p.type === 'sign') p.solid = true;
     if (p.type === 'barrel') { p.solid = true; p.hp = 2; }
+    if (p.type === 'crack') { p.solid = true; p.hp = 3; }
     if (p.type === 'gate') p.solid = !G.flags.gateOpen;
   }
   G.map.props = G.map.props.filter(p =>
@@ -200,6 +204,22 @@ function interactProp(pr) {
   {
     if (pr.type === 'sign') {
       say(null, [pr.text]);
+      return;
+    }
+    if (pr.type === 'note') {
+      // scraps left by the masons who sealed the crypt; finding them all
+      // is its own small reward
+      const first = !G.flags['note_' + pr.id];
+      G.flags['note_' + pr.id] = true;
+      sfx('pickup');
+      const found = Object.keys(G.flags).filter(k => k.startsWith('note_')).length;
+      say('A water-stained scrap', [pr.text],
+          first ? { onDone: () => { G.banner = { text: 'Crypt record ' + found + ' of ' + TOTAL_NOTES, t: 2.2 };
+                                    saveGame(); } } : {});
+      return;
+    }
+    if (pr.type === 'crack') {
+      say(null, ['Fitted stone, but the mortar is split top to bottom.\nIt would come down under a hard blow.']);
       return;
     }
     if (pr.type === 'chest') {
@@ -747,6 +767,8 @@ function drawWorld(ctx) {
     else if (pr.type === 'torch') { name = 'torch'; fi = frameOf('torch', G.time + pr.x * 0.13); }
     else if (pr.type === 'barrel') name = 'barrel';
     else if (pr.type === 'gate') name = 'gate_bars';
+    else if (pr.type === 'crack') name = 'cracked_wall';
+    else if (pr.type === 'note') name = 'note';
     else if (pr.type === 'spikes') {
       // flush with the floor, so it draws with the ground, not the crowd
       drawAnim(ctx, 'spikes', pr.stage || 0, px - cx, py - cy);
@@ -991,5 +1013,6 @@ window.EMBER = {  // debug/testing handle
   G, changeMap, dialogueState, spawnMonster, startDodge, hitMonster,
   addItem, countItem, useQuick, useConsumable, poisonPlayer, SHOPS,
   skills, gainXp, playerStats, startAttack, moveset, attackBox,
+  isSolidAt, routeTo, isBlockedAt: feetBlockedAt,
 };
 boot();

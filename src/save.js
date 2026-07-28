@@ -11,7 +11,7 @@ export function saveGame() {
     player: {
       hp: p.hp, maxHp: p.maxHp, level: p.level, xp: p.xp, gold: p.gold,
       weapon: p.weapon, armor: p.armor, inv: p.inv, quick: p.quick,
-      sp: p.sp, skills: p.skills,
+      sp: p.sp, skills: p.skills, upgrades: p.upgrades,
       x: p.x, y: p.y,
     },
     mapName: G.mapName,
