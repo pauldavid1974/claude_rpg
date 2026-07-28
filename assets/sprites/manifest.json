@@ -778,6 +778,14 @@
    "h": 16,
    "fps": 0
   },
+  "spikes": {
+   "sheet": "props",
+   "row": 6,
+   "frames": 3,
+   "w": 16,
+   "h": 16,
+   "fps": 0
+  },
   "item_dagger": {
    "sheet": "items",
    "row": 0,

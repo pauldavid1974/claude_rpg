@@ -93,13 +93,19 @@ export function changeMap(name, tx, ty) {
   for (const p of G.map.props) {
     if (p.type === 'chest') p.solid = true;
     if (p.type === 'sign') p.solid = true;
-    if (p.type === 'barrel') p.solid = true;
+    if (p.type === 'barrel') { p.solid = true; p.hp = 2; }
     if (p.type === 'gate') p.solid = !G.flags.gateOpen;
   }
-  G.map.props = G.map.props.filter(p => !(p.type === 'gate' && G.flags.gateOpen));
+  G.map.props = G.map.props.filter(p =>
+    !(p.type === 'gate' && G.flags.gateOpen) &&
+    !G.flags['smashed_' + p.x + '_' + p.y + '_' + name]);
+  // Elites are rolled per visit outside town, so the same road is never
+  // quite the same road twice.
+  const eliteChance = name === 'overworld' ? 0.14 : name.startsWith('dungeon') ? 0.20 : 0;
   for (const d of G.map.monsterDefs) {
     if (d.type === 'boss' && G.flags.bossDead) continue;
-    G.monsters.push(spawnMonster(d.type, d.x, d.y));
+    const elite = d.elite || (d.type !== 'boss' && Math.random() < eliteChance);
+    G.monsters.push(spawnMonster(d.type, d.x, d.y, elite));
   }
   for (const d of G.map.npcDefs) G.npcs.push(spawnNpc(d));
   for (const d of G.map.pickupDefs) {
@@ -741,7 +747,13 @@ function drawWorld(ctx) {
     else if (pr.type === 'torch') { name = 'torch'; fi = frameOf('torch', G.time + pr.x * 0.13); }
     else if (pr.type === 'barrel') name = 'barrel';
     else if (pr.type === 'gate') name = 'gate_bars';
-    if (name) drawables.push({ y: py + 14, f: () => drawAnim(ctx, name, fi, px - cx, py - cy) });
+    else if (pr.type === 'spikes') {
+      // flush with the floor, so it draws with the ground, not the crowd
+      drawAnim(ctx, 'spikes', pr.stage || 0, px - cx, py - cy);
+      continue;
+    }
+    const jig = pr.shakeT > 0 ? Math.round(Math.sin(G.time * 60) * 2) : 0;
+    if (name) drawables.push({ y: py + 14, f: () => drawAnim(ctx, name, fi, px - cx + jig, py - cy) });
   }
   for (const pk of G.pickups) {
     const bobY = pk.kind === 'item' && pk.t > 0.5 ? Math.sin(G.time * 4 + pk.x) * 1.5 : 0;
@@ -895,6 +907,22 @@ function drawPlayer(ctx, cx, cy) {
 }
 
 function drawMonster(ctx, m, cx, cy) {
+  // elites wear their colour on the ground, so you can read the room
+  if (m.elite) {
+    const ex = Math.round(m.x + m.size / 2 - cx);
+    const ey = Math.round(m.y + m.size - 2 - cy);
+    const r = m.size * 0.45 + Math.sin(G.time * 3 + m.homeX) * 0.8;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.30;
+    ctx.strokeStyle = m.eliteColor;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.ellipse(ex, ey, r, r * 0.45, 0, 0, 7); ctx.stroke();
+    ctx.globalAlpha = 0.13;
+    ctx.fillStyle = m.eliteColor;
+    ctx.beginPath(); ctx.ellipse(ex, ey, r, r * 0.45, 0, 0, 7); ctx.fill();
+    ctx.restore();
+  }
   let name = m.anim;
   if (m.type === 'boss' && (m.telegraphT > 0 || m.lungeT > 0 || m.atkPhase !== 'none')) name = 'boss_attack';
   const fi = frameOf(name, G.time + m.homeX * 0.07);
@@ -929,12 +957,33 @@ function drawMonster(ctx, m, cx, cy) {
                    Math.round(dy - 3 + Math.sin(a) * 2), 1, 1);
     }
   }
-  // boss hp bar
+  // boss hp bar, with the phase thresholds marked on it
   if (m.type === 'boss') {
+    const bx = Math.round(m.x - 4 - cx), by = Math.round(m.y - 6 - cy);
     ctx.fillStyle = '#181425';
-    ctx.fillRect(Math.round(m.x - 4 - cx), Math.round(m.y - 6 - cy), 40, 4);
-    ctx.fillStyle = '#e43b44';
-    ctx.fillRect(Math.round(m.x - 3 - cx), Math.round(m.y - 5 - cy), Math.round(38 * m.hp / m.maxHp), 2);
+    ctx.fillRect(bx, by, 40, 4);
+    ctx.fillStyle = m.phaseT > 0 ? '#fee761' : '#e43b44';
+    ctx.fillRect(bx + 1, by + 1, Math.round(38 * m.hp / m.maxHp), 2);
+    ctx.fillStyle = '#181425';
+    ctx.fillRect(bx + 1 + Math.round(38 * 0.33), by + 1, 1, 2);
+    ctx.fillRect(bx + 1 + Math.round(38 * 0.66), by + 1, 1, 2);
+    if (m.phaseT > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.5 * m.phaseT;
+      ctx.strokeStyle = '#b55088';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(Math.round(m.x + m.size / 2 - cx), Math.round(m.y + m.size / 2 - cy),
+              10 + (1.1 - m.phaseT) * 46, 0, 7);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+  // elite name floats above once you are close enough to care
+  if (m.elite && Math.hypot(m.x - G.player.x, m.y - G.player.y) < 70) {
+    drawText(ctx, m.eliteName, Math.round(m.x + m.size / 2 - cx) -
+             m.eliteName.length * 2, Math.round(m.y - 7 - cy), m.eliteColor);
   }
 }
 

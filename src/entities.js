@@ -230,10 +230,38 @@ export function monsterAttackBox(m) {
   };
 }
 
-export function spawnMonster(type, tx, ty) {
+// Elites: the same silhouette with one nasty idea bolted on, plus a
+// coloured aura so you can decide to walk the other way.
+export const ELITE = {
+  slime:    { name: 'Rendspawn', color: '#63c74d', trait: 'splits' },
+  skeleton: { name: 'Bonecarl',  color: '#c0cbdc', trait: 'armoured' },
+  bat:      { name: 'Venomwing', color: '#b55088', trait: 'venom' },
+  archer:   { name: 'Sharpshot', color: '#feae34', trait: 'volley' },
+  brute:    { name: 'Warden',    color: '#e43b44', trait: 'armoured' },
+};
+
+export function makeElite(m) {
+  const e = ELITE[m.type];
+  if (!e) return m;
+  m.elite = e.trait;
+  m.eliteName = e.name;
+  m.eliteColor = e.color;
+  m.hp = m.maxHp = Math.round(m.maxHp * 1.8);
+  m.atk = Math.ceil(m.atk * 1.3);
+  m.xp = Math.round(m.xp * 2.2);
+  m.gold = [Math.round(m.gold[0] * 1.6), Math.round(m.gold[1] * 1.8)];
+  if (e.trait === 'armoured') {
+    m.poise = m.poiseMax = Math.round(m.poiseMax * 2);
+    m.armour = 2;
+    m.speed *= 0.85;
+  }
+  return m;
+}
+
+export function spawnMonster(type, tx, ty, elite = false) {
   const s = MONSTER_STATS[type];
   const size = type === 'boss' ? 32 : 16;
-  return {
+  const m = {
     type, ...structuredClone(s),
     maxHp: s.hp, poiseMax: s.poise,
     x: tx * TILE, y: ty * TILE, size,
@@ -242,9 +270,10 @@ export function spawnMonster(type, tx, ty) {
     hurtT: 0, kbx: 0, kby: 0, telegraphT: 0,
     atkPhase: 'none', atkT: 0, atkCd: Math.random() * 0.8, atkAng: 0, atkHit: false,
     face: 0, prevX: tx * TILE, prevY: ty * TILE,
-    staggerT: 0,
+    staggerT: 0, armour: 0, elite: null,
     vx: 0, vy: 0,
   };
+  return elite ? makeElite(m) : m;
 }
 
 function playerCenter() {
@@ -303,7 +332,9 @@ export function updateMonster(m, dt) {
       moveEntity(m, Math.cos(m.atkAng) * A.lunge * dt, Math.sin(m.atkAng) * A.lunge * dt);
       if (!m.atkHit && overlaps(monsterAttackBox(m), feetBox(p))) {
         m.atkHit = true;
+        const wasHurt = p.iframes <= 0;
         damagePlayer(m.atk, mc.x, mc.y);
+        if (wasHurt && m.elite === 'venom') poisonPlayer(7);
       }
       if (m.atkT <= 0) { m.atkPhase = 'recover'; m.atkT = A.recover; }
     } else if (m.atkT <= 0) {
@@ -371,7 +402,12 @@ export function updateMonster(m, dt) {
       } else if (dist < 150) { // in range: hold and shoot
         if (m.t <= 0) {
           m.t = 2.1;
-          monsterShoot(mc.x, mc.y, Math.atan2(dy, dx), 95, m.atk);
+          const a = Math.atan2(dy, dx);
+          if (m.elite === 'volley') {
+            for (const off of [-0.22, 0, 0.22]) monsterShoot(mc.x, mc.y, a + off, 95, m.atk);
+          } else {
+            monsterShoot(mc.x, mc.y, a, 95, m.atk);
+          }
         }
       } else if (m.t <= 0) {
         m.t = 1.5;
@@ -391,14 +427,22 @@ export function updateMonster(m, dt) {
       break;
 
     case 'boss': {
-      const enraged = m.hp < m.maxHp / 2;
-      const spd = m.speed * (enraged ? 1.5 : 1);
+      // Three phases, each announced by a break in the fight: the Bone
+      // King speeds up, calls his dead, then floods the floor with spikes.
+      const want = m.hp > m.maxHp * 0.66 ? 1 : m.hp > m.maxHp * 0.33 ? 2 : 3;
+      if (want !== (m.phase || 1)) enterBossPhase(m, want);
+      const phase = m.phase || 1;
+      const spd = m.speed * (1 + (phase - 1) * 0.35);
+      if (m.phaseT > 0) { m.phaseT -= dt; break; }   // roaring, untouchable-ish
       if (m.telegraphT > 0) {
         m.telegraphT -= dt;
         if (m.telegraphT <= 0) {
-          for (let i = 0; i < 8; i++) {
-            const a = i / 8 * Math.PI * 2 + G.time;
-            monsterShoot(mc.x, mc.y - 6, a, 80, m.atk - 2, true);
+          const rings = phase;
+          for (let r = 0; r < rings; r++) {
+            for (let i = 0; i < 8; i++) {
+              const a = i / 8 * Math.PI * 2 + G.time + r * 0.4;
+              monsterShoot(mc.x, mc.y - 6, a, 80 - r * 14, m.atk - 2, true);
+            }
           }
           m.lungeT = 0.5;
           m.lungeAng = Math.atan2(dy, dx);
@@ -409,7 +453,7 @@ export function updateMonster(m, dt) {
       } else if (dist < 200) {
         moveEntity(m, Math.cos(Math.atan2(dy, dx)) * spd * dt, Math.sin(Math.atan2(dy, dx)) * spd * dt);
         if (m.t <= 0) {
-          m.t = enraged ? 2.4 : 3.6;
+          m.t = [0, 3.6, 2.6, 1.9][phase];
           m.telegraphT = 0.6;
         }
       }
@@ -426,6 +470,49 @@ function faceFromMotion(m) {
   const mvx = m.x - m.prevX, mvy = m.y - m.prevY;
   if (mvx * mvx + mvy * mvy > 0.004) m.face = Math.atan2(mvy, mvx);
   m.prevX = m.x; m.prevY = m.y;
+}
+
+// Each phase break clears the floor, then changes the rules.
+function enterBossPhase(m, phase) {
+  m.phase = phase;
+  m.phaseT = 1.1;
+  m.telegraphT = 0;
+  m.lungeT = 0;
+  m.atkPhase = 'none';
+  m.staggerT = 0;
+  m.poise = m.poiseMax;
+  G.projectiles.length = 0;
+  G.shake = Math.max(G.shake, 8);
+  sfx('boss');
+  for (let i = 0; i < 30; i++) {
+    spawnPix(m.x + m.size / 2, m.y + m.size / 2, i % 2 ? '#b55088' : '#68386c', 7, 130, 0.6);
+  }
+  if (phase === 2) {
+    G.banner = { text: 'The Bone King calls his dead', t: 2.4 };
+    for (const off of [[-34, -10], [34, -10]]) {
+      const s = spawnMonster('skeleton', 0, 0);
+      s.x = m.x + m.size / 2 + off[0]; s.y = m.y + m.size / 2 + off[1];
+      s.prevX = s.x; s.prevY = s.y; s.homeX = s.x; s.homeY = s.y;
+      s.gold = [0, 2]; s.xp = 3;
+      G.monsters.push(s);
+    }
+  } else if (phase === 3) {
+    G.banner = { text: 'The floor of the hall splits open', t: 2.4 };
+    // spikes erupt across the arena floor, on staggered cycles
+    const tx = Math.round(m.homeX / TILE), ty = Math.round(m.homeY / TILE);
+    let k = 0;
+    for (let j = -2; j <= 3; j++) {
+      for (let i = -3; i <= 4; i++) {
+        if ((i + j) % 3 !== 0) continue;
+        const sx = tx + i, sy = ty + j;
+        if (isSolidAt(G.map, sx * TILE + 8, sy * TILE + 8)) continue;
+        G.map.props.push({
+          type: 'spikes', x: sx, y: sy, dmg: 3,
+          period: 2.6, offset: (k++ % 4) * 0.65, t: 0, stage: 0,
+        });
+      }
+    }
+  }
 }
 
 // Poise damage from a hit; zero poise means a stagger.

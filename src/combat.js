@@ -1,7 +1,7 @@
 // Melee combat, damage, projectiles, drops and pickups.
 
 import { G, TILE } from './state.js';
-import { feetBox, overlaps, playerStats, breakPoise } from './entities.js';
+import { feetBox, overlaps, playerStats, breakPoise, spawnMonster } from './entities.js';
 import { sfx } from './audio.js';
 import { spawnPix, spawnEffect, addFloat, sparkle } from './particles.js';
 import { addItem } from './inventory.js';
@@ -100,15 +100,75 @@ export function updateCombat(dt) {
       hitMonster(m, Math.max(1, Math.round(dmg)), ang, poise,
                  back ? 'backstab' : crit ? 'crit' : null);
     }
+    smashables(hb, p.swingId);
   }
   updateProjectiles(dt);
   updatePickups(dt);
+  updateHazards(dt);
+}
+
+// Barrels take the same swing enemies do, and cough up what was in them.
+function smashables(hb, swingId) {
+  for (let i = G.map.props.length - 1; i >= 0; i--) {
+    const pr = G.map.props[i];
+    if (!pr.hp || pr.lastHitSwing === swingId) continue;
+    const box = { x: pr.x * TILE + 2, y: pr.y * TILE + 4, w: 12, h: 11 };
+    if (!overlaps(hb, box)) continue;
+    pr.lastHitSwing = swingId;
+    pr.hp--;
+    pr.shakeT = 0.18;
+    const cx = pr.x * TILE + 8, cy = pr.y * TILE + 9;
+    if (pr.hp > 0) {
+      sfx('slash_hit');
+      spawnPix(cx, cy, '#b86f50', 4, 40, 0.25);
+      continue;
+    }
+    G.map.props.splice(i, 1);
+    G.flags['smashed_' + pr.x + '_' + pr.y + '_' + G.mapName] = true;
+    sfx('break');
+    G.shake = Math.max(G.shake, 3);
+    for (let k = 0; k < 12; k++) {
+      spawnPix(cx, cy, k % 2 ? '#733e39' : '#b86f50', 5, 90, 0.5);
+    }
+    const roll = Math.random();
+    if (roll < 0.45) {
+      for (let k = 0; k < 2 + Math.floor(Math.random() * 3); k++) {
+        const a = Math.random() * Math.PI * 2;
+        G.pickups.push({ kind: 'coin', x: cx, y: cy, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60 - 20, t: 0 });
+      }
+    } else if (roll < 0.60) {
+      G.pickups.push({ kind: 'heart', x: cx, y: cy, vx: 0, vy: -20, t: 0 });
+    } else if (roll < 0.72) {
+      G.pickups.push({ kind: 'item', item: Math.random() < 0.5 ? 'potion' : 'knife',
+                       x: cx, y: cy, vx: 0, vy: -25, t: 0 });
+    }
+  }
+}
+
+// Floor spikes: flush, a beat of warning, then out.
+export function updateHazards(dt) {
+  const p = G.player;
+  for (const pr of G.map.props) {
+    if (pr.shakeT > 0) pr.shakeT -= dt;
+    if (pr.type !== 'spikes') continue;
+    pr.t = (pr.t || 0) + dt;
+    const period = pr.period || 2.4;
+    const phase = ((pr.t + (pr.offset || 0)) % period) / period;
+    pr.stage = phase < 0.62 ? 0 : phase < 0.76 ? 1 : 2;
+    if (pr.stage !== 2) { pr.bit = false; continue; }
+    const box = { x: pr.x * TILE + 2, y: pr.y * TILE + 4, w: 12, h: 10 };
+    if (!pr.bit && overlaps(box, feetBox(p))) {
+      pr.bit = true;
+      damagePlayer(pr.dmg || 3, pr.x * TILE + 8, pr.y * TILE + 8);
+    }
+  }
 }
 
 export function hitMonster(m, dmg, ang, poiseDmg = 1, crit = null) {
   // a staggered enemy is wide open
   const staggered = m.staggerT > 0;
   if (staggered) dmg = Math.round(dmg * 1.5);
+  if (m.armour) dmg = Math.max(1, dmg - m.armour);
   m.hp -= dmg;
   m.hurtT = crit ? 0.24 : 0.15;
   const kb = (m.type === 'brute' ? 40 : m.type === 'boss' ? 15 : 120) * (crit ? 1.4 : 1);
@@ -147,6 +207,19 @@ const DROP_TABLE = {
 
 export function killMonster(m) {
   G.monsters.splice(G.monsters.indexOf(m), 1);
+  // a rendspawn does not die so much as become two problems
+  if (m.elite === 'splits' && !m.spawned) {
+    for (const off of [-7, 7]) {
+      const kid = spawnMonster(m.type, 0, 0);
+      kid.x = m.x + off; kid.y = m.y + (off > 0 ? 4 : -4);
+      kid.prevX = kid.x; kid.prevY = kid.y;
+      kid.homeX = kid.x; kid.homeY = kid.y;
+      kid.hp = kid.maxHp = Math.max(2, Math.round(m.maxHp * 0.3));
+      kid.size = 16; kid.spawned = true; kid.xp = Math.round(m.xp * 0.2);
+      kid.gold = [0, 1];
+      G.monsters.push(kid);
+    }
+  }
   sfx('die');
   G.shake = Math.max(G.shake, m.type === 'boss' ? 6 : 3);
   spawnEffect(m.die, m.x, m.y);

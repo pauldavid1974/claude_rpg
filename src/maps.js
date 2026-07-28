@@ -146,6 +146,8 @@ function overworld() {
       { type: 'sign', x: 2, y: 13, text: 'Emberdale, home of\nElder Rowan.' },
       { type: 'chest', id: 'ow_forest', x: 32, y: 26, loot: { gold: 40, items: ['potion'] } },
       { type: 'chest', id: 'ow_pond', x: 4, y: 4, loot: { gold: 15, items: ['gel'] } },
+      { type: 'barrel', x: 22, y: 16 }, { type: 'barrel', x: 24, y: 16 },
+      { type: 'barrel', x: 30, y: 9 },
     ],
     pickups: [
       { id: 'herb1', item: 'herb', x: 27, y: 7 },
@@ -331,6 +333,18 @@ function dungeon() {
       { type: 'gate', id: 'crypt_gate', x: 19, y: 10 }, { type: 'gate', id: 'crypt_gate2', x: 20, y: 10 },
       { type: 'chest', id: 'dg_chest', x: 5, y: 15, loot: { gold: 60, items: ['potion_big'] } },
       { type: 'sign', x: 18, y: 21, text: 'Turn back. The Bone King\ndoes not share his hall.' },
+      { type: 'barrel', x: 15, y: 19 }, { type: 'barrel', x: 20, y: 20 },
+      { type: 'barrel', x: 6, y: 20 }, { type: 'barrel', x: 12, y: 15 },
+      { type: 'barrel', x: 30, y: 13 }, { type: 'barrel', x: 23, y: 19 },
+      { type: 'barrel', x: 8, y: 4 }, { type: 'barrel', x: 14, y: 4 },
+      // a spiked corridor guards the approach
+      { type: 'spikes', x: 18, y: 13, period: 2.4, offset: 0 },
+      { type: 'spikes', x: 19, y: 13, period: 2.4, offset: 0.8 },
+      { type: 'spikes', x: 18, y: 12, period: 2.4, offset: 1.6 },
+      { type: 'spikes', x: 19, y: 12, period: 2.4, offset: 0.4 },
+      { type: 'spikes', x: 26, y: 16, period: 2.8, offset: 0 },
+      { type: 'spikes', x: 27, y: 16, period: 2.8, offset: 1.2 },
+      { type: 'spikes', x: 9, y: 17, period: 3.0, offset: 0.5 },
     ],
     pickups: [],
   };

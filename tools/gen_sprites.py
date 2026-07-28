@@ -1454,6 +1454,44 @@ def build_props():
     s.add("torch", [torch(flame1), torch(flame2), torch(flame3)], 8)
     s.add("gate_bars", [gate_bars])
     s.add("barrel", [barrel])
+
+    # Floor spikes: flush, creeping, out.  The plate never moves, so the
+    # eye tracks the blades.
+    def spikes(n):
+        f = F(
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "..000000000000..",
+            "..0eeeeeeeeee0..",
+            "..0e11111111e0..",
+            "..0e11111111e0..",
+            "..0eeeeeeeeee0..",
+            "..000000000000..",
+            "................",
+        )
+        if n == 0:
+            for x in (3, 6, 9, 12):
+                f[11][x] = "3"
+                f[12][x] = "2"
+            return f
+        top = 9 if n == 1 else 5
+        for x in (3, 6, 9, 12):
+            for y in range(top, 13):
+                f[y][x] = "5" if y < 11 else "4"
+                if y > top:
+                    f[y][x - 1] = "0"
+                    f[y][x + 1] = "0"
+            f[top][x] = "6"
+        return f
+
+    s.add("spikes", [spikes(0), spikes(1), spikes(2)])
     return s
 
 
