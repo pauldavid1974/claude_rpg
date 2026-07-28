@@ -2,7 +2,7 @@
 
 import { G, VW, VH, TILE, setView, resetRun } from './state.js';
 import { loadAssets, drawAnim, drawAnimFlash, frameOf } from './assets.js';
-import { initInput, input, endFrame } from './input.js';
+import { initInput, input, endFrame, pollGamepad } from './input.js';
 import { initAudio, music, sfx, toggleMute, setMuted, setCombatMusic } from './audio.js';
 import { buildMap, outsideCell, isSolidAt } from './maps.js';
 import {
@@ -33,7 +33,10 @@ import {
   drawGameover, drawTransition, drawText, pressKey, tickPresses,
   updateDanger, drawDanger, drawMinimap, drawCompass,
 } from './ui.js';
-import { saveGame, loadGame, clearSave } from './save.js';
+import { saveGame, loadGame, clearSave, anySave, newestSlot } from './save.js';
+import {
+  openSlots, updateSlots, drawSlots, openSummary, updateSummary, drawSummary, newStats,
+} from './slots.js';
 import { ITEMS } from './items.js';
 
 // --- boot ---------------------------------------------------------------
@@ -137,6 +140,8 @@ function newGame() {
   G.player = createPlayer();
   G.quests = {};
   G.flags = {};
+  G.ngPlus = 0;
+  G.stats = newStats();
   G.mode = 'play';
   refreshDerived(true);
   changeMap('town1', 12, 10);
@@ -147,20 +152,41 @@ function newGame() {
 }
 
 function continueGame(save) {
+  if (!save) { newGame(); return; }
   G.player = createPlayer();
   Object.assign(G.player, save.player);
   G.quests = save.quests || {};
   G.flags = save.flags || {};
   G.muted = !!save.muted;
+  G.ngPlus = save.ngPlus || 0;
+  G.stats = Object.assign(newStats(), save.stats || {});
   G.mode = 'play';
   refreshDerived();
-  changeMap(save.mapName || 'town1', 2, 2);
-  G.player.x = save.player.x;
-  G.player.y = save.player.y;
+  changeMap(save.mapName || 'town1', 12, 10);
+  // a save without coordinates (or a corrupt one) keeps the map's spawn
+  if (Number.isFinite(save.player.x) && Number.isFinite(save.player.y)) {
+    G.player.x = save.player.x;
+    G.player.y = save.player.y;
+  }
+}
+
+// Everything you learned and carried comes with you; the world resets and
+// hits harder.
+function newGamePlus() {
+  const p = G.player;
+  G.ngPlus = (G.ngPlus || 0) + 1;
+  G.quests = {};
+  G.flags = {};
+  p.hp = p.maxHp;
+  G.mode = 'play';
+  G.banner = { text: 'New Game+' + G.ngPlus + ' - Emberdale forgets, the crypt does not', t: 3.5 };
+  changeMap('town1', 12, 10);
+  saveGame();
 }
 
 function respawn() {
   const p = G.player;
+  G.stats.deaths++;
   p.gold = Math.floor(p.gold * 0.8);
   p.hp = p.maxHp;
   p.iframes = 2;
@@ -266,6 +292,7 @@ let last = 0;
 
 function loop(ts) {
   requestAnimationFrame(loop);
+  pollGamepad();
   const now = ts / 1000;
   let dt = Math.min(0.05, now - (last || now));
   const dtReal = dt;
@@ -284,8 +311,25 @@ function loop(ts) {
   switch (G.mode) {
     case 'title': {
       const act = updateTitle();
-      if (act === 'New Game') newGame();
-      else if (act === 'Continue') continueGame(loadGame());
+      // a first-time player should not have to pick a slot they do not have
+      if (act === 'New Game') { if (anySave()) openSlots('new'); else { G.slot = 0; newGame(); } }
+      else if (act === 'Continue') {
+        G.slot = Math.max(0, newestSlot());
+        continueGame(loadGame(G.slot));
+      } else if (act === 'Saved runs') openSlots('load');
+      break;
+    }
+    case 'slots': {
+      const act = updateSlots(dt);
+      if (act === 'back') { G.mode = 'title'; G.ui.title.hasSave = anySave(); }
+      else if (act && act.load !== undefined) { G.slot = act.load; continueGame(loadGame(G.slot)); }
+      else if (act && act.fresh !== undefined) { G.slot = act.fresh; newGame(); }
+      break;
+    }
+    case 'summary': {
+      const act = updateSummary(dt);
+      if (act === 'ng') newGamePlus();
+      else if (act === 'stay') G.mode = 'play';
       break;
     }
     case 'play': updatePlay(dt); break;
@@ -523,6 +567,7 @@ function updatePlay(dt) {
   if (input.held.right) mvx += 1;
   if (input.held.up) mvy -= 1;
   if (input.held.down) mvy += 1;
+  if (!mvx && !mvy) { mvx = input.axis.x; mvy = input.axis.y; }
   if (mvx || mvy) {
     G.ui.goal = null;   // keyboard overrides the mouse goal
   } else if (goal) {
@@ -604,6 +649,7 @@ function updatePlay(dt) {
   G.cam.x += (targetX - G.cam.x) * Math.min(1, dt * 8);
   G.cam.y += (targetY - G.cam.y) * Math.min(1, dt * 8);
 
+  G.stats.playtime += dt;
   G.saveTimer += dt;
   if (G.saveTimer > 10) { G.saveTimer = 0; saveGame(); }
 }
@@ -713,8 +759,9 @@ function draw() {
   ctx.fillStyle = '#181425';
   ctx.fillRect(0, 0, VW, VH);
 
-  if (G.mode === 'title') {
+  if (G.mode === 'title' || G.mode === 'slots') {
     drawTitle(ctx);
+    if (G.mode === 'slots') drawSlots(ctx);
     drawTransition(ctx);
     return;
   }
@@ -744,6 +791,7 @@ function draw() {
     case 'quests': drawQuests(ctx); break;
     case 'skills': drawSkills(ctx); break;
     case 'settings': drawSettings(ctx); break;
+    case 'summary': drawSummary(ctx); break;
     case 'shop': drawShop(ctx); break;
     case 'pause': drawPause(ctx); break;
     case 'gameover': drawGameover(ctx, G.ui.gameoverT); break;
@@ -1088,6 +1136,6 @@ window.EMBER = {  // debug/testing handle
   G, changeMap, dialogueState, spawnMonster, startDodge, hitMonster,
   addItem, countItem, useQuick, useConsumable, poisonPlayer, SHOPS,
   skills, gainXp, playerStats, startAttack, moveset, attackBox,
-  isSolidAt, routeTo, isBlockedAt: feetBlockedAt, questAim, settings,
+  isSolidAt, routeTo, isBlockedAt: feetBlockedAt, questAim, settings, openSummary,
 };
 boot();

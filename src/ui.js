@@ -533,7 +533,7 @@ export function updateDanger(dt) {
 
 export function drawDanger(ctx) {
   const D = G.ui.danger;
-  if (!D || !D.level) return;
+  if (!D || !D.level || !Number.isFinite(D.pulse)) return;
   if (D.level === 2) {                    // colour drains first...
     ctx.save();
     ctx.globalCompositeOperation = 'saturation';
@@ -558,7 +558,7 @@ export function drawDanger(ctx) {
 import { setMusicEnabled } from './audio.js';
 
 function titleOptions(st) {
-  const opts = st.hasSave ? ['Continue', 'New Game'] : ['New Game'];
+  const opts = st.hasSave ? ['Continue', 'New Game', 'Saved runs'] : ['New Game'];
   opts.push('Music: ' + (G.musicOn ? 'On' : 'Off'));
   return opts;
 }

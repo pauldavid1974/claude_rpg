@@ -258,6 +258,8 @@ export function killMonster(m) {
       G.pickups.push({ kind: 'item', item, x: cx, y: cy + 4, vx: (Math.random() - 0.5) * 40, vy: -30, t: 0 });
     }
   }
+  G.stats.kills++;
+  if (m.elite) G.stats.elites++;
   gainXp(m.xp);
   if (m.type === 'boss') {
     G.flags.bossDead = true;
@@ -396,7 +398,9 @@ function updatePickups(dt) {
       G.pickups.splice(i, 1);
       if (pk.id) G.flags['got_' + pk.id] = true;   // map pickups never respawn
       if (pk.kind === 'coin') {
-        p.gold += pk.value || 1;
+        const v = pk.value || 1;
+        p.gold += v;
+        G.stats.gold += v;
         sfx('coin');
       } else if (pk.kind === 'heart') {
         p.hp = Math.min(p.maxHp, p.hp + 2);

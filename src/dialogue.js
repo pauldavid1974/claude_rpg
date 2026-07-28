@@ -15,6 +15,7 @@ import { addItem, hasItem, removeItem, countItem } from './inventory.js';
 import { ITEMS } from './items.js';
 import { openShop } from './shops.js';
 import { spentPoints, respec, RESPEC_COST } from './skills.js';
+import { openSummary } from './slots.js';
 
 // A script: { name, pages: [str], choice?: {prompt, yes, no, onYes, onNo}, onDone }
 let script = null, page = 0, chars = 0, choiceSel = 0, choosing = false;
@@ -303,7 +304,7 @@ function elder(npc) {
       return say(npc.name, [
         'By the old fires... the Ember Amulet. You truly felled the Bone King.',
         'Emberdale owes you a debt no coin can square - but take this all the same, hero.',
-      ], { onDone: () => { removeItem('amulet', 1); turnIn('q_boss'); G.flags.mainDone = true; } });
+      ], { onDone: () => { removeItem('amulet', 1); turnIn('q_boss'); G.flags.mainDone = true; openSummary(); } });
     }
     return say(npc.name, ['The crypt lies north. Strike true, and bring our amulet home.']);
   }

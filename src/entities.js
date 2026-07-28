@@ -263,7 +263,9 @@ export function makeElite(m) {
 export function spawnMonster(type, tx, ty, elite = false) {
   const s = MONSTER_STATS[type];
   const size = type === 'boss' ? 32 : 16;
-  const tough = (G.difficulty && G.difficulty.hp) || 1;
+  // New Game+ stacks on top of the difficulty setting
+  const ng = 1 + (G.ngPlus || 0) * 0.35;
+  const tough = ((G.difficulty && G.difficulty.hp) || 1) * ng;
   const m = {
     type, ...structuredClone(s),
     hp: Math.max(1, Math.round(s.hp * tough)),
@@ -278,6 +280,12 @@ export function spawnMonster(type, tx, ty, elite = false) {
     staggerT: 0, armour: 0, elite: null,
     vx: 0, vy: 0,
   };
+  if (G.ngPlus) {
+    m.atk = Math.ceil(m.atk * (1 + G.ngPlus * 0.18));
+    m.xp = Math.round(m.xp * (1 + G.ngPlus * 0.3));
+    m.gold = [Math.round(m.gold[0] * (1 + G.ngPlus * 0.35)),
+             Math.round(m.gold[1] * (1 + G.ngPlus * 0.35))];
+  }
   return elite ? makeElite(m) : m;
 }
 

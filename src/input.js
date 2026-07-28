@@ -22,8 +22,59 @@ export const input = {
   held: {},
   pressed: {},   // true for one frame after keydown
   mouse: { x: 0, y: 0, clicked: false, rclicked: false, held: false, rheld: false },
+  axis: { x: 0, y: 0 },   // analog stick, when a pad is connected
+  pad: false,
   anyKey: false, // true for one frame on any keydown (title screen)
 };
+
+// --- gamepad ------------------------------------------------------------
+// Standard layout.  Buttons feed the same logical names the keyboard uses,
+// so nothing downstream needs to know a pad is attached.
+
+const PAD_BUTTONS = {
+  0: 'attack', 1: 'dodge', 2: 'interact', 3: 'inv',
+  4: 'q1', 5: 'q2', 6: 'q3', 7: 'q3',
+  8: 'skills', 9: 'pause',
+  12: 'up', 13: 'down', 14: 'left', 15: 'right',
+};
+const DEAD = 0.28;
+const padWas = {};
+
+export function pollGamepad() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  let pad = null;
+  for (const p of pads) if (p && p.connected) { pad = p; break; }
+  input.pad = !!pad;
+  if (!pad) { input.axis.x = input.axis.y = 0; return; }
+
+  const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
+  const mag = Math.hypot(ax, ay);
+  input.axis.x = mag > DEAD ? ax : 0;
+  input.axis.y = mag > DEAD ? ay : 0;
+
+  // the stick also drives menu navigation, one step per push
+  const dir = { left: input.axis.x < -0.6, right: input.axis.x > 0.6,
+                up: input.axis.y < -0.6, down: input.axis.y > 0.6 };
+
+  for (const i in PAD_BUTTONS) {
+    const name = PAD_BUTTONS[i];
+    const b = pad.buttons[i];
+    const down = !!(b && (b.pressed || b.value > 0.5));
+    if (down && !padWas[i]) { input.pressed[name] = true; input.anyKey = true; }
+    if (down) input.held[name] = true;
+    else if (padWas[i] && !keyHeld[name]) input.held[name] = false;
+    padWas[i] = down;
+  }
+  for (const name of ['left', 'right', 'up', 'down']) {
+    const key = 'axis_' + name;
+    if (dir[name] && !padWas[key]) input.pressed[name] = true;
+    padWas[key] = dir[name];
+  }
+}
+
+// Track which logical buttons the keyboard is holding, so releasing a pad
+// button never cancels a key the player is still pressing.
+const keyHeld = {};
 
 let firstGesture = null;
 
@@ -37,14 +88,19 @@ export function initInput(onFirstGesture) {
     if (b) {
       if (!input.held[b]) input.pressed[b] = true;
       input.held[b] = true;
+      keyHeld[b] = true;
       e.preventDefault();
     }
   });
   addEventListener('keyup', (e) => {
     const b = KEYMAP[e.code];
-    if (b) input.held[b] = false;
+    if (b) { input.held[b] = false; keyHeld[b] = false; }
   });
-  addEventListener('blur', () => { input.held = {}; input.mouse.held = input.mouse.rheld = false; });
+  addEventListener('blur', () => {
+    input.held = {};
+    for (const k in keyHeld) keyHeld[k] = false;
+    input.mouse.held = input.mouse.rheld = false;
+  });
 
   const canvas = document.getElementById('game');
   canvas.addEventListener('mousemove', (e) => {
