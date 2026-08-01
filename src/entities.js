@@ -270,7 +270,7 @@ export function spawnMonster(type, tx, ty, elite = false) {
   const ng = 1 + (G.ngPlus || 0) * 0.35;
   const tough = ((G.difficulty && G.difficulty.hp) || 1) * ng * (1 + tier * 0.22);
   const m = {
-    type, ...structuredClone(s),
+    type, ...JSON.parse(JSON.stringify(s)),
     hp: Math.max(1, Math.round(s.hp * tough)),
     maxHp: Math.max(1, Math.round(s.hp * tough)),
     poiseMax: s.poise,

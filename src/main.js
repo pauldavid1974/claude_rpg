@@ -61,25 +61,86 @@ const SLOWMO_TIME = 1.0;
 const MAX_VIEW_W = 340, MAX_VIEW_H = 240;
 const MIN_VIEW_W = 150, MIN_VIEW_H = 110;
 
+// Browsers cap how big a canvas backing store may be, and they do it
+// silently: ask for more than the cap and every draw is a no-op, so the page
+// shows nothing but its background colour.  The cap varies - Safari is far
+// stingier than Chrome - which is how a build can look fine in one browser
+// and dead in another on the same machine.  Stay well inside the meanest of
+// them and let CSS scale the rest; this is pixel art, nobody can tell.
+const MAX_CANVAS_DIM = 4096;
+const MAX_CANVAS_PIXELS = 4096 * 2304;
+
+// Sizing the canvas resets it, taint included, so this is safe to run right
+// after a resize and nowhere else.
+function canvasUsable() {
+  try {
+    const c = G.ctx;
+    if (!c || !canvas.width || !canvas.height) return false;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.fillStyle = '#ff00ff';
+    c.fillRect(0, 0, 1, 1);
+    const d = c.getImageData(0, 0, 1, 1).data;
+    c.clearRect(0, 0, 1, 1);
+    // Loosely: privacy modes that fuzz canvas readback move the numbers a
+    // little, and that is not the same as a surface that draws nothing.
+    return d[0] > 200 && d[2] > 200 && d[1] < 80;
+  } catch (e) {
+    return false;
+  }
+}
+
+export function diagnostics() {
+  return 'dpr ' + (window.devicePixelRatio || 1) +
+    ' | window ' + innerWidth + 'x' + innerHeight +
+    ' | canvas ' + canvas.width + 'x' + canvas.height +
+    ' | view ' + VW + 'x' + VH + ' @' + G.zoom;
+}
+
 function resize() {
   const dpr = window.devicePixelRatio || 1;
+  const winW = Math.max(1, innerWidth || 0), winH = Math.max(1, innerHeight || 0);
   // An embedder that has not sized its frame yet reports 0, which used to
   // hand the canvas a width of zero and leave it that way for good.
-  const dw = Math.max(MIN_VIEW_W, Math.round((innerWidth || 0) * dpr));
-  const dh = Math.max(MIN_VIEW_H, Math.round((innerHeight || 0) * dpr));
-  let z = Math.max(1, Math.ceil(Math.max(dw / MAX_VIEW_W, dh / MAX_VIEW_H)));
-  z = Math.max(1, Math.min(z, Math.floor(dw / MIN_VIEW_W), Math.floor(dh / MIN_VIEW_H)));
-  const vw = Math.max(MIN_VIEW_W, Math.ceil(dw / z));
-  const vh = Math.max(MIN_VIEW_H, Math.ceil(dh / z));
-  setView(vw, vh);
-  G.zoom = z;
-  canvas.width = vw * z;
-  canvas.height = vh * z;
-  const cssW = vw * z / dpr, cssH = vh * z / dpr;
-  canvas.style.width = cssW + 'px';
-  canvas.style.height = cssH + 'px';
-  canvas.style.left = Math.min(0, (innerWidth - cssW) / 2) + 'px';
-  canvas.style.top = Math.min(0, (innerHeight - cssH) / 2) + 'px';
+  const full = Math.min(1, MAX_CANVAS_DIM / (winW * dpr), MAX_CANVAS_DIM / (winH * dpr),
+    Math.sqrt(MAX_CANVAS_PIXELS / (winW * dpr * winH * dpr)));
+
+  function apply(want) {
+    const dw = Math.max(MIN_VIEW_W, Math.round(winW * dpr * want));
+    const dh = Math.max(MIN_VIEW_H, Math.round(winH * dpr * want));
+    let z = Math.max(1, Math.ceil(Math.max(dw / MAX_VIEW_W, dh / MAX_VIEW_H)));
+    z = Math.max(1, Math.min(z, Math.floor(dw / MIN_VIEW_W), Math.floor(dh / MIN_VIEW_H)));
+    let vw = Math.max(MIN_VIEW_W, Math.ceil(dw / z));
+    let vh = Math.max(MIN_VIEW_H, Math.ceil(dh / z));
+    // Rounding up to whole game pixels can push the backing store a few
+    // device pixels back over the cap; give those back to CSS.
+    if (vw * z > MAX_CANVAS_DIM) vw = Math.max(MIN_VIEW_W, Math.floor(MAX_CANVAS_DIM / z));
+    if (vh * z > MAX_CANVAS_DIM) vh = Math.max(MIN_VIEW_H, Math.floor(MAX_CANVAS_DIM / z));
+    setView(vw, vh);
+    G.zoom = z;
+    canvas.width = vw * z;
+    canvas.height = vh * z;
+    // Device pixels per CSS pixel actually in play, which is the real dpr
+    // until the cap bites and less than it afterwards.
+    const scale = Math.max(0.01, (vw * z) / winW);
+    const cssW = vw * z / scale, cssH = vh * z / scale;
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    canvas.style.left = Math.min(0, (winW - cssW) / 2) + 'px';
+    canvas.style.top = Math.min(0, (winH - cssH) / 2) + 'px';
+  }
+
+  // If the browser still will not give us a usable surface at that size,
+  // keep stepping down rather than handing the player a blank screen.
+  let want = full;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    apply(want);
+    if (canvasUsable()) return;
+    want *= 0.6;
+  }
+  // Nothing satisfied the read-back.  A browser that lies about pixel data
+  // looks exactly like a dead surface from here, so put the full-size
+  // layout back and let the blank-screen watchdog be the judge.
+  apply(full);
 }
 addEventListener('resize', resize);
 // Some embedders size the frame without firing a window resize.
@@ -90,14 +151,41 @@ if (window.ResizeObserver) {
     if (k !== last) { last = k; resize(); }
   }).observe(document.documentElement);
 }
-resize();
 
 // A blank canvas tells nobody anything.  If boot fails - a sheet that will
-// not decode, storage that throws - say so on screen where it can be read
-// and reported, rather than dying silently.
+// not decode, storage that throws, a surface the browser will not hand over
+// - say so on screen where it can be read and reported, rather than dying
+// silently.  The canvas is the first thing to die, so the message cannot
+// live only there: plain DOM shows up even when the drawing surface is gone.
+let overlay = null;
+function showOverlay(msg) {
+  try {
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.setAttribute('style', 'position:fixed;inset:0;z-index:9;padding:24px;' +
+        'font:14px/1.5 monospace;color:#c0cbdc;background:#181425;overflow:auto');
+      overlay.addEventListener('click', () => { overlay.remove(); overlay = null; });
+      document.body.appendChild(overlay);
+    }
+    overlay.textContent = '';
+    const h = document.createElement('div');
+    h.setAttribute('style', 'color:#e43b44;font-size:18px;font-weight:bold;margin-bottom:12px');
+    h.textContent = 'Emberdale could not start';
+    const p = document.createElement('div');
+    p.textContent = msg;
+    const d = document.createElement('div');
+    d.setAttribute('style', 'color:#8b9bb4;margin-top:16px');
+    d.textContent = diagnostics() + '\n' + navigator.userAgent +
+      '\nReload to try again, or click this message to dismiss it.';
+    d.style.whiteSpace = 'pre-wrap';
+    overlay.append(h, p, d);
+  } catch (e) { /* nothing left to write to */ }
+}
+
 function fatal(err) {
   const ctx = G.ctx;
   const msg = String((err && err.message) || err || 'unknown error');
+  showOverlay(msg);
   try {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#181425';
@@ -118,6 +206,48 @@ function fatal(err) {
   console.error('Emberdale boot failed:', err);
 }
 
+resize();
+
+// A player looking at a flat rectangle cannot tell us anything useful about
+// why.  If a few seconds of frames have produced nothing but one colour,
+// put the numbers on screen where they can be read out.
+const probe = document.createElement('canvas');
+probe.width = 64; probe.height = 48;
+const probeCtx = probe.getContext('2d', { willReadFrequently: true });
+
+function looksBlank() {
+  try {
+    if (!canvas.width || !canvas.height) return true;
+    // Shrink the whole frame into a thumbnail first: sampling a few patches
+    // of a 4000px canvas only ever finds flat sky and calls a working game
+    // dead.
+    probeCtx.clearRect(0, 0, probe.width, probe.height);
+    probeCtx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, probe.width, probe.height);
+    const d = probeCtx.getImageData(0, 0, probe.width, probe.height).data;
+    const seen = new Set();
+    // Coarse buckets, so resampling noise does not count as detail.
+    for (let i = 0; i < d.length; i += 4) {
+      seen.add((d[i] >> 3) + ',' + (d[i + 1] >> 3) + ',' + (d[i + 2] >> 3));
+      if (seen.size > 3) return false;
+    }
+    return true;
+  } catch (e) {
+    return false;   // cannot read it back, so cannot claim it is empty
+  }
+}
+
+function watchBlank() {
+  setTimeout(() => {
+    if (!looksBlank()) return;
+    setTimeout(() => {
+      if (looksBlank()) {
+        showOverlay('The game is running, but nothing is reaching the screen. ' +
+          'That is usually the browser refusing to draw a canvas this size.');
+      }
+    }, 1500);
+  }, 3000);
+}
+
 async function boot() {
   await loadAssets();
   await document.fonts.load('16px "Jacquard 12"').catch(() => {});
@@ -130,6 +260,7 @@ async function boot() {
   const save = loadGame();
   G.ui.title = { sel: 0, hasSave: !!save };
   requestAnimationFrame(loop);
+  watchBlank();
 }
 
 // --- map / run management -----------------------------------------------
@@ -1235,3 +1366,4 @@ window.EMBER = {  // debug/testing handle
 };
 boot().catch(fatal);
 addEventListener('unhandledrejection', (e) => fatal(e.reason));
+addEventListener('error', (e) => fatal(e.error || e.message));
